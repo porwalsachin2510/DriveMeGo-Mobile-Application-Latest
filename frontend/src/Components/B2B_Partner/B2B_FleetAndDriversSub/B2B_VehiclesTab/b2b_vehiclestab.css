@@ -1,0 +1,383 @@
+/* =====================================================================
+   B2B Vehicles Tab — DriveMeGo brand system (navy + teal, Plus Jakarta).
+   Class names preserved exactly; only visual language modernized.
+   ===================================================================== */
+.b2b-operator-dashboard-vehicles-tab-vehicles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  font-family: var(--dmg-font);
+}
+
+.b2b-operator-dashboard-vehicles-tab-no-vehicles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 20px;
+  text-align: center;
+  background: var(--dmg-card);
+  border-radius: var(--dmg-radius);
+  border: 1.5px dashed var(--dmg-line);
+  grid-column: 1 / -1;
+  font-family: var(--dmg-font);
+}
+
+.b2b-operator-dashboard-vehicles-tab-no-vehicles-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+  margin-bottom: 16px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-no-vehicles-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-no-vehicles h3 {
+  margin: 0 0 8px 0;
+  color: var(--dmg-navy);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.b2b-operator-dashboard-vehicles-tab-no-vehicles p {
+  margin: 0;
+  color: var(--dmg-muted);
+  font-size: 14px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-card {
+  padding: 22px 20px;
+  background-color: var(--dmg-card);
+  border-radius: 18px;
+  border: 1px solid var(--dmg-line);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 2px 10px rgba(10, 42, 67, 0.05);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(18, 176, 196, 0.4);
+  box-shadow: var(--dmg-shadow);
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+  border-radius: 13px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-status-badge {
+  padding: 5px 13px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.b2b-operator-dashboard-vehicles-tab-status-badge.success {
+  background-color: #e6f7ef;
+  color: #1a8f5e;
+}
+
+.b2b-operator-dashboard-vehicles-tab-status-badge.warning {
+  background-color: #fff3e0;
+  color: #b26a00;
+}
+
+.b2b-operator-dashboard-vehicles-tab-status-badge.danger {
+  background-color: #fdecec;
+  color: #c0392b;
+}
+
+.b2b-operator-dashboard-vehicles-tab-status-badge.info {
+  background-color: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+.b2b-operator-dashboard-vehicles-tab-status-badge.pending {
+  background-color: #fff8e1;
+  color: #b26a00;
+}
+
+/* Approval notice shown in place of status actions until approved */
+.b2b-operator-dashboard-vehicles-tab-approval-notice {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.b2b-operator-dashboard-vehicles-tab-approval-notice.pending {
+  background-color: #fff8e1;
+  color: #8a5a00;
+  border: 1px solid #ffe082;
+}
+
+.b2b-operator-dashboard-vehicles-tab-approval-notice.rejected {
+  background-color: #fdecec;
+  color: #b71c1c;
+  border: 1px solid #f5c6cb;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-plate {
+  font-size: 13px;
+  color: var(--dmg-muted-2);
+  margin: 0;
+}
+
+/* Expand/Collapse Toggle Button */
+.b2b-operator-dashboard-vehicles-tab-expand-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: var(--dmg-bg);
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dmg-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.b2b-operator-dashboard-vehicles-tab-expand-toggle-btn:hover {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+.b2b-operator-dashboard-vehicles-tab-expand-toggle-btn svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-details {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid var(--dmg-line);
+  border-bottom: 1px solid var(--dmg-line);
+  padding: 12px 0;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-details.b2b-operator-dashboard-vehicles-tab-collapsed {
+  max-height: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-details.b2b-operator-dashboard-vehicles-tab-expanded {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.b2b-operator-dashboard-vehicles-tab-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-detail-label {
+  color: var(--dmg-muted);
+}
+
+.b2b-operator-dashboard-vehicles-tab-detail-value {
+  color: var(--dmg-ink);
+  font-weight: 700;
+}
+
+.b2b-operator-dashboard-vehicles-tab-vehicle-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  min-width: 100px;
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn.b2b-operator-dashboard-vehicles-tab-activate {
+  background: linear-gradient(135deg, #1fb87a 0%, #159d64 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(26, 143, 94, 0.24);
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn.b2b-operator-dashboard-vehicles-tab-activate:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(26, 143, 94, 0.3);
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn.b2b-operator-dashboard-vehicles-tab-maintenance {
+  background: linear-gradient(135deg, #f6a723 0%, #d98a12 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(246, 167, 35, 0.24);
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn.b2b-operator-dashboard-vehicles-tab-maintenance:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(246, 167, 35, 0.3);
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn-more {
+  background: var(--dmg-navy);
+  color: white;
+  padding: 9px 12px;
+  box-shadow: 0 4px 12px rgba(10, 42, 67, 0.2);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  min-width: 42px;
+  transition: all 0.2s;
+}
+
+.b2b-operator-dashboard-vehicles-tab-action-btn-more:hover {
+  background: var(--dmg-navy-700);
+  transform: translateY(-1px);
+}
+
+.b2b-operator-dashboard-vehicles-tab-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: 12px;
+  box-shadow: var(--dmg-shadow-lg);
+  z-index: 9999;
+  min-width: 180px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.b2b-operator-dashboard-vehicles-tab-dropdown-item {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dmg-ink);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  border-bottom: 1px solid var(--dmg-line);
+}
+
+.b2b-operator-dashboard-vehicles-tab-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.b2b-operator-dashboard-vehicles-tab-dropdown-item:hover {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+@media (max-width: 1200px) {
+  .b2b-operator-dashboard-vehicles-tab-vehicles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .b2b-operator-dashboard-vehicles-tab-vehicles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .b2b-operator-dashboard-vehicles-tab-vehicle-card {
+    gap: 12px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .b2b-operator-dashboard-vehicles-tab-vehicle-name {
+    font-size: 14px;
+  }
+
+  .b2b-operator-dashboard-vehicles-tab-vehicle-plate {
+    font-size: 11px;
+  }
+
+  .b2b-operator-dashboard-vehicles-tab-detail-row {
+    font-size: 12px;
+  }
+
+  .b2b-operator-dashboard-vehicles-tab-action-btn {
+    font-size: 11px;
+    padding: 9px;
+  }
+}

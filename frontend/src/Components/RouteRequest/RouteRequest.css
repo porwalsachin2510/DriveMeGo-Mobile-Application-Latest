@@ -1,0 +1,288 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================================
+   DriveMeGo — Route Request Modal
+   Rebuilt on the brand palette: deep navy + bright teal. Teal is the
+   action color (the logo has no red). Plus Jakarta Sans throughout.
+   ===================================================================== */
+
+.route-request-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 42, 67, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.route-request-modal {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(10, 42, 67, 0.28);
+  border: 1px solid #e4ecf3;
+  animation: rr-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes rr-slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.route-request-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 24px;
+  border-bottom: 1px solid #e4ecf3;
+}
+
+.route-request-header h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0a2a43;
+}
+
+.close-btn {
+  background: #f6fafc;
+  border: 1px solid #e4ecf3;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #5b6b7b;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e6f7fa;
+  color: #0a2a43;
+  border-color: rgba(18, 176, 196, 0.4);
+}
+
+.route-request-existing {
+  padding: 20px 24px 0;
+}
+
+.route-request-existing:not(:has(.arr)) {
+  display: none;
+}
+
+.route-request-existing:not(:has(.arr)) + .route-request-divider {
+  display: none;
+}
+
+.route-request-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+  margin: 20px 0 4px;
+  color: #8598a8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.route-request-divider::before,
+.route-request-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e4ecf3;
+}
+
+.route-request-form {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #0a2a43;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid #e4ecf3;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  color: #0a2a43;
+  background-color: #f6fafc;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #12b0c4;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(18, 176, 196, 0.14);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.required {
+  color: #e0533d;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.days-toggle-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-toggle-btn {
+  padding: 9px 15px;
+  border: 1.5px solid #e4ecf3;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5b6b7b;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.day-toggle-btn:hover {
+  border-color: #12b0c4;
+  color: #0e97a8;
+}
+
+.day-toggle-btn.active {
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(18, 176, 196, 0.28);
+}
+
+.error-message {
+  background-color: #fdecec;
+  border: 1px solid #f7c9c9;
+  color: #c0392b;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.success-message {
+  background-color: #e6f7ee;
+  border: 1px solid #bbeacd;
+  color: #16794c;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.cancel-btn,
+.submit-btn {
+  padding: 13px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.cancel-btn {
+  background-color: #eef3f8;
+  color: #0a2a43;
+  border: 1px solid #e4ecf3;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: #e2eaf1;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(18, 176, 196, 0.3);
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #12b0c4 0%, #0c8695 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(18, 176, 196, 0.38);
+}
+
+.cancel-btn:disabled,
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .route-request-modal {
+    width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    width: 100%;
+  }
+}

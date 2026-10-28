@@ -1,0 +1,1015 @@
+/* Premium Admin Wallet Management - Inter Font */
+.drivemego-admin-wallet-management {
+  width: 100%;
+  padding: 24px;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.drivemego-wallet-header {
+  position: relative;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  border-radius: 22px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(18, 176, 196, 0.28) 0%, rgba(18, 176, 196, 0) 55%),
+    linear-gradient(135deg, #0a2a43 0%, #123a58 60%, #0e2f49 100%);
+  box-shadow: 0 18px 40px rgba(10, 42, 67, 0.28);
+}
+
+.drivemego-wallet-header::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  bottom: -80px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(18, 176, 196, 0.32) 0%, rgba(18, 176, 196, 0) 70%);
+  pointer-events: none;
+}
+
+.drivemego-wallet-header-titles {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.drivemego-wallet-header-icon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  background: rgba(18, 176, 196, 0.22);
+  color: #7fe3ef;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drivemego-wallet-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.02em;
+}
+
+.drivemego-wallet-header-subtitle {
+  font-size: 14px;
+  color: rgba(226, 240, 248, 0.82);
+  margin: 0;
+}
+
+.drivemego-wallet-overview {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.drivemego-wallet-overview .drivemego-overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  backdrop-filter: blur(6px);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.drivemego-wallet-overview .drivemego-overview-item:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.drivemego-wallet-overview .drivemego-overview-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(226, 240, 248, 0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.drivemego-wallet-overview .drivemego-overview-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.drivemego-wallet-overview .drivemego-overview-value.drivemego-warning {
+  color: #ffcf70;
+}
+
+.drivemego-wallet-overview .drivemego-overview-value.drivemego-danger {
+  color: #ff9d9d;
+}
+
+/* Stats Grid */
+.drivemego-wallet-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.drivemego-wallet-stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow 0.2s;
+}
+
+.drivemego-wallet-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.drivemego-wallet-stat-card h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.drivemego-wallet-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0a2a43;
+  display: block;
+}
+
+.drivemego-wallet-stat-value.drivemego-highlight {
+  color: #12b0c4;
+}
+
+.drivemego-wallet-stat-value.drivemego-warning {
+  color: #F59E0B;
+}
+
+/* Tabs */
+.drivemego-wallet-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: #fff;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid #e4ecf3;
+  box-shadow: 0 2px 12px rgba(10, 42, 67, 0.05);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.drivemego-wallet-tab {
+  padding: 11px 22px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #5b6b7b;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+}
+
+.drivemego-wallet-tab:hover {
+  color: #0a2a43;
+  background: #eef3f8;
+}
+
+.drivemego-wallet-tab.drivemego-active {
+  color: #fff;
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  box-shadow: 0 8px 18px rgba(18, 176, 196, 0.3);
+}
+
+.drivemego-wallet-tab .drivemego-badge {
+  background: #EF4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Filters */
+.drivemego-wallet-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.drivemego-wallet-search {
+  flex: 1;
+  min-width: 250px;
+  max-width: 400px;
+  padding: 10px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.drivemego-wallet-search:focus {
+  outline: none;
+  border-color: #12b0c4;
+}
+
+.drivemego-wallet-filter-select {
+  padding: 10px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #334155;
+  background: white;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.drivemego-wallet-filter-select:focus {
+  outline: none;
+  border-color: #12b0c4;
+}
+
+/* Tables */
+.drivemego-wallet-table-container {
+  overflow-x: auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.drivemego-wallet-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.drivemego-wallet-table thead {
+  background: #f8fafc;
+}
+
+.drivemego-wallet-table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drivemego-wallet-table td {
+  padding: 16px;
+  font-size: 14px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.drivemego-wallet-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.drivemego-wallet-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* User Info Cell */
+.drivemego-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drivemego-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #12b0c4, #0e97a8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.drivemego-user-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.drivemego-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drivemego-user-name {
+  font-weight: 600;
+  color: #0a2a43;
+}
+
+.drivemego-user-email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Balance Cell */
+.drivemego-balance-cell {
+  font-weight: 700;
+  color: #0a2a43;
+}
+
+.drivemego-balance-cell.drivemego-low-balance {
+  color: #EF4444;
+}
+
+.drivemego-balance-cell.drivemego-medium-balance {
+  color: #F59E0B;
+}
+
+.drivemego-balance-cell.drivemego-high-balance {
+  color: #22C55E;
+}
+
+/* Role Badge */
+.drivemego-role-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.drivemego-role-badge.drivemego-b2c_partner {
+  background: #e6f7fa;
+  color: #1D4ED8;
+}
+
+.drivemego-role-badge.drivemego-b2b_partner {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.drivemego-role-badge.drivemego-corporate {
+  background: #E0E7FF;
+  color: #4338CA;
+}
+
+.drivemego-role-badge.drivemego-commuter {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.drivemego-role-badge.drivemego-admin {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+/* Status Badge */
+.drivemego-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.drivemego-status-badge.drivemego-active {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.drivemego-status-badge.drivemego-pending {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.drivemego-status-badge.drivemego-suspended {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+/* Action Buttons */
+.drivemego-action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.drivemego-action-btn {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.drivemego-action-btn.drivemego-primary {
+  background: #12b0c4;
+  color: white;
+}
+
+.drivemego-action-btn.drivemego-primary:hover {
+  background: #0e97a8;
+}
+
+.drivemego-action-btn.drivemego-secondary {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.drivemego-action-btn.drivemego-secondary:hover {
+  background: #e2e8f0;
+}
+
+.drivemego-action-btn.drivemego-danger {
+  background: transparent;
+  color: #EF4444;
+  border: 1px solid #EF4444;
+}
+
+.action-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Activity Feed */
+.drivemego-activity-feed {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.drivemego-activity-feed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+drivemego-activity-feed-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0a2a43;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drivemego-live-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.drivemego-activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.drivemego-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s;
+}
+
+.drivemego-activity-item:last-child {
+  border-bottom: none;
+}
+
+.drivemego-activity-item:hover {
+  background: #f8fafc;
+}
+
+.drivemego-activity-item.drivemego-new {
+  background: #F0FDF9;
+}
+
+.drivemego-activity-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.drivemego-activity-icon.drivemego-deposit {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.drivemego-activity-icon.drivemego-withdrawal {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+.drivemego-activity-icon.drivemego-transfer {
+  background: #e6f7fa;
+  color: #1D4ED8;
+}
+
+.drivemego-activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.drivemego-activity-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0a2a43;
+  margin-bottom: 2px;
+}
+
+.drivemego-activity-description {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.drivemego-activity-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.drivemego-activity-time {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.drivemego-activity-amount {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.drivemego-activity-amount.drivemego-positive {
+  color: #22C55E;
+}
+
+.drivemego-activity-amount.drivemego-negative {
+  color: #EF4444;
+}
+
+/* Notification Modal */
+.drivemego-notification-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.drivemego-notification-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.drivemego-notification-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drivemego-notification-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0a2a43;
+  margin: 0;
+}
+
+.drivemego-close-modal-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.drivemego-close-modal-btn:hover {
+  color: #334155;
+}
+
+.drivemego-notification-modal-body {
+  padding: 24px;
+}
+
+.drivemego-form-group {
+  margin-bottom: 20px;
+}
+
+.drivemego-form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.drivemego-form-group input,
+.drivemego-form-group textarea,
+.drivemego-form-group select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.drivemego-form-group input:focus,
+.drivemego-form-group textarea:focus,
+.drivemego-form-group select:focus {
+  outline: none;
+  border-color: #12b0c4;
+}
+
+.drivemego-form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.drivemego-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drivemego-checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #12b0c4;
+}
+
+.drivemego-notification-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+drivemego-modal-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drivemego-modal-btn.drivemego-cancel {
+  background: #f1f5f9;
+  border: none;
+  color: #334155;
+}
+
+.drivemego-modal-btn.drivemego-cancel:hover {
+  background: #e2e8f0;
+}
+
+.drivemego-modal-btn.drivemego-send {
+  background: #12b0c4;
+  border: none;
+  color: white;
+}
+
+.drivemego-modal-btn.send:hover {
+  background: #0e97a8;
+}
+
+.drivemego-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Wallet Details Panel */
+.drivemego-wallet-details-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.drivemego-wallet-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drivemego-wallet-user-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.drivemego-wallet-user-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #12b0c4, #0e97a8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 22px;
+}
+
+.drivemego-wallet-user-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.drivemego-wallet-user-details h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0a2a43;
+  margin: 0 0 4px 0;
+}
+
+.drivemego-wallet-user-details p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.drivemego-wallet-balance-display {
+  text-align: right;
+}
+
+.drivemego-wallet-balance-display .drivemego-balance-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drivemego-wallet-balance-display .drivemego-balance-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0a2a43;
+}
+
+.drivemego-wallet-details-body {
+  padding: 24px;
+}
+
+.drivemego-wallet-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.drivemego-wallet-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivemego-wallet-info-item .drivemego-info-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.drivemego-wallet-info-item .drivemego-info-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0a2a43;
+}
+
+.drivemego-transactions-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0a2a43;
+  margin: 0 0 16px 0;
+}
+
+/* Pagination */
+.drivemego-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.drivemego-pagination-btn {
+  padding: 8px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drivemego-pagination-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #12b0c4;
+}
+
+.drivemego-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.drivemego-pagination-info {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* Empty State */
+.drivemego-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+}
+
+.drivemego-empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.drivemego-empty-state h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0 0 8px 0;
+}
+
+.drivemego-empty-state p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Loading */
+.drivemego-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  font-size: 15px;
+  color: #64748b;
+}
+
+/* Selected Users for Bulk */
+.drivemego-selected-users-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #F0FDF9;
+  border: 1px solid #12b0c4;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.drivemego-selected-users-bar span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0D9488;
+}
+
+.drivemego-bulk-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .drivemego-wallet-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .drivemego-admin-wallet-management {
+    padding: 16px;
+  }
+
+  .drivemego-wallet-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .drivemego-wallet-filters {
+    flex-direction: column;
+  }
+
+  .drivemego-wallet-search {
+    max-width: none;
+  }
+
+  .drivemego-wallet-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-wallet-overview {
+    flex-direction: column;
+  }
+
+  .drivemego-notification-modal {
+    max-width: none;
+    margin: 20px;
+  }
+
+  .drivemego-wallet-details-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .drivemego-wallet-balance-display {
+    text-align: left;
+  }
+}
+
+/* DriveMeGo brand font */
+.drivemego-admin-wallet-management {
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}

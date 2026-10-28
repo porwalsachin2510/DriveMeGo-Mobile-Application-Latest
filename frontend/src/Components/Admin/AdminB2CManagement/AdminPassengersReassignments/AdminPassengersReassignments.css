@@ -1,0 +1,389 @@
+/* =====================================================================
+   Admin B2C · Passengers & Bookings — DriveMeGo brand system
+   Navy (#0a2a43) + logo teal (#12b0c4), Plus Jakarta Sans.
+   ===================================================================== */
+.ad-dash-passenger-reassignments {
+  --pr-navy: #0a2a43;
+  --pr-teal: #12b0c4;
+  --pr-teal-600: #0e97a8;
+  --pr-teal-050: #e6f7fa;
+  --pr-ink: #0f2233;
+  --pr-muted: #5b6b7b;
+  --pr-line: #e4ecf3;
+  --pr-bg: #f5f8fb;
+  width: 100%;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--pr-ink);
+}
+
+/* Header */
+.ad-dash-pr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  gap: 16px;
+}
+
+.ad-dash-pr-refresh-btn {
+  padding: 10px 18px;
+  border: 1px solid var(--pr-line);
+  background-color: #fff;
+  color: var(--pr-navy);
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.ad-dash-pr-refresh-btn:hover:not(:disabled) {
+  background-color: var(--pr-teal-050);
+  border-color: var(--pr-teal);
+}
+
+.ad-dash-pr-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ad-dash-pr-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--pr-navy);
+  margin: 0 0 4px 0;
+}
+
+.ad-dash-pr-subtitle {
+  font-size: 14px;
+  color: var(--pr-muted);
+  margin: 0;
+}
+
+/* Filters */
+.ad-dash-pr-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.ad-dash-pr-filters select {
+  padding: 11px 14px;
+  border: 1px solid var(--pr-line);
+  border-radius: 11px;
+  font-size: 14px;
+  background-color: #fff;
+  color: var(--pr-ink);
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+  min-width: 140px;
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ad-dash-pr-filters select:focus {
+  border-color: var(--pr-teal);
+  box-shadow: 0 0 0 3px var(--pr-teal-050);
+}
+
+.ad-dash-pr-filters input[type="text"] {
+  flex: 1;
+  min-width: 240px;
+  padding: 11px 14px;
+  border: 1px solid var(--pr-line);
+  border-radius: 11px;
+  font-size: 14px;
+  color: var(--pr-ink);
+  background-color: #fff;
+  transition: all 0.2s;
+  outline: none;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.ad-dash-pr-filters input[type="text"]:focus {
+  border-color: var(--pr-teal);
+  box-shadow: 0 0 0 3px var(--pr-teal-050);
+}
+
+.ad-dash-pr-filters input[type="text"]::placeholder { color: #9ca3af; }
+
+/* Table Container */
+.ad-dash-pr-table {
+  background-color: #fff;
+  border-radius: 18px;
+  border: 1px solid var(--pr-line);
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 2px 12px rgba(10, 42, 67, 0.05);
+}
+
+.ad-dash-pr-table table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.ad-dash-pr-table thead {
+  background-color: var(--pr-bg);
+  border-bottom: 1px solid var(--pr-line);
+}
+
+.ad-dash-pr-table th {
+  padding: 15px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background-color: var(--pr-bg);
+}
+
+.ad-dash-pr-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s;
+}
+
+.ad-dash-pr-table tbody tr:hover { background-color: var(--pr-bg); }
+.ad-dash-pr-table tbody tr:last-child { border-bottom: none; }
+
+.ad-dash-pr-table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--pr-ink);
+  vertical-align: middle;
+  background-color: transparent;
+}
+
+/* Passenger Info */
+.ad-dash-passenger-reassignments .passenger-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ad-dash-passenger-reassignments .passenger-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--pr-line);
+  flex-shrink: 0;
+}
+
+.ad-dash-passenger-reassignments .passenger-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-dash-passenger-reassignments .passenger-name {
+  font-weight: 700;
+  color: var(--pr-navy);
+  font-size: 14px;
+}
+
+.ad-dash-passenger-reassignments .passenger-email {
+  font-size: 12px;
+  color: var(--pr-muted);
+}
+
+/* Route Info */
+.ad-dash-passenger-reassignments .route-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-dash-passenger-reassignments .route-name {
+  font-weight: 600;
+  color: var(--pr-navy);
+  font-size: 13px;
+}
+
+.ad-dash-passenger-reassignments .route-direction {
+  font-size: 12px;
+  color: var(--pr-muted);
+}
+
+.ad-dash-passenger-reassignments .monthly-pass-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  background: var(--pr-teal-050);
+  color: var(--pr-teal-600);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* Provider Info */
+.ad-dash-passenger-reassignments .provider-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-dash-passenger-reassignments .provider-text {
+  font-size: 13px;
+  color: var(--pr-ink);
+  font-weight: 600;
+}
+
+.ad-dash-passenger-reassignments .vehicle-text {
+  font-size: 11px;
+  color: var(--pr-muted);
+}
+
+/* Payment Info */
+.ad-dash-passenger-reassignments .payment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ad-dash-passenger-reassignments .payment-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ad-dash-passenger-reassignments .payment-status.completed { color: #16a34a; }
+.ad-dash-passenger-reassignments .payment-status.pending { color: #d97706; }
+.ad-dash-passenger-reassignments .payment-status.failed { color: #dc2626; }
+
+/* Amount */
+.ad-dash-passenger-reassignments .amount-text {
+  font-weight: 800;
+  color: var(--pr-navy);
+}
+
+/* Payment Badge */
+.ad-dash-passenger-reassignments .payment-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background-color: #eef3f8;
+  color: #475569;
+}
+
+/* Status Badge */
+.ad-dash-passenger-reassignments .status-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Date Info */
+.ad-dash-passenger-reassignments .date-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-dash-passenger-reassignments .request-date {
+  font-size: 13px;
+  color: var(--pr-ink);
+}
+
+/* Action Buttons */
+.ad-dash-passenger-reassignments .action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ad-dash-passenger-reassignments .view-btn {
+  padding: 7px 14px;
+  border: none;
+  background-color: var(--pr-navy);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.ad-dash-passenger-reassignments .view-btn:hover { background-color: #123a58; }
+
+.ad-dash-passenger-reassignments .approve-btn {
+  padding: 7px 14px;
+  border: none;
+  background: linear-gradient(135deg, #16a34a 0%, #12833c 100%);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.ad-dash-passenger-reassignments .approve-btn:hover { filter: brightness(1.05); }
+
+.ad-dash-passenger-reassignments .reject-btn {
+  padding: 7px 14px;
+  border: none;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.ad-dash-passenger-reassignments .reject-btn:hover { filter: brightness(1.05); }
+
+.ad-dash-passenger-reassignments .approve-btn:disabled,
+.ad-dash-passenger-reassignments .reject-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* No Reassignments */
+.ad-dash-passenger-reassignments .no-reassignments {
+  text-align: center;
+  padding: 44px 20px;
+  color: var(--pr-muted);
+  font-size: 14px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--pr-line);
+  border-radius: 18px;
+  margin-top: 16px;
+}
+
+/* Loading */
+.ad-dash-passenger-reassignments .loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--pr-muted);
+  font-weight: 600;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1024px) {
+  .ad-dash-pr-filters { flex-direction: column; }
+  .ad-dash-pr-filters input[type="text"] { min-width: unset; }
+}

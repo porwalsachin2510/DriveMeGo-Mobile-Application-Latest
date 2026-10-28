@@ -1,0 +1,450 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================================
+   DriveMeGo — Corporate Trip Management
+   Brand system: deep navy + teal, Plus Jakarta Sans, rounded cards.
+   ===================================================================== */
+
+.corporate-trip-management {
+  --tm-navy: #0a2a43;
+  --tm-teal: #12b0c4;
+  --tm-teal-600: #0e97a8;
+  --tm-teal-050: #e6f7fa;
+  --tm-ink: #0f2233;
+  --tm-muted: #5b6b7b;
+  --tm-line: #e4ecf3;
+  --tm-bg: #eef3f8;
+  --tm-card: #ffffff;
+  --tm-cta: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  --tm-radius: 18px;
+  padding: 28px;
+  background: var(--tm-bg);
+  min-height: 100vh;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--tm-ink);
+}
+
+/* ============ HEADER BANNER ============ */
+.trip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+  padding: 26px 28px;
+  border-radius: 24px;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(680px 260px at 92% -30%, rgba(18, 176, 196, 0.34), transparent 60%),
+    linear-gradient(135deg, var(--tm-navy) 0%, #123a58 60%, #0e3350 100%);
+}
+
+.trip-header h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin: 0;
+}
+
+.create-trip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  background: var(--tm-cta);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(18, 176, 196, 0.32);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.create-trip-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(18, 176, 196, 0.4);
+}
+
+.loading {
+  text-align: center;
+  padding: 48px;
+  color: var(--tm-muted);
+  font-size: 16px;
+}
+
+.no-trips {
+  text-align: center;
+  padding: 64px 20px;
+  background: var(--tm-card);
+  border-radius: var(--tm-radius);
+  border: 1px solid var(--tm-line);
+  box-shadow: 0 10px 30px rgba(10, 42, 67, 0.06);
+}
+
+.no-trips p {
+  color: var(--tm-muted);
+  font-size: 16px;
+  margin: 0;
+}
+
+/* ============ TRIP CARDS ============ */
+.trips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 22px;
+}
+
+.trip-card {
+  background: var(--tm-card);
+  border-radius: var(--tm-radius);
+  border: 1px solid var(--tm-line);
+  padding: 22px;
+  box-shadow: 0 2px 10px rgba(10, 42, 67, 0.05);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.trip-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(18, 176, 196, 0.4);
+  box-shadow: 0 18px 40px rgba(10, 42, 67, 0.12);
+}
+
+.trip-header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.trip-header-info h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tm-navy);
+  margin: 0;
+}
+
+.trip-status {
+  padding: 5px 12px;
+  border-radius: 100px;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trip-details {
+  margin-bottom: 16px;
+}
+
+.trip-info p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: var(--tm-muted);
+}
+
+.trip-info strong {
+  color: var(--tm-ink);
+  font-weight: 700;
+}
+
+.trip-seats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #f6f9fc;
+  border-radius: 12px;
+}
+
+.seats-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.seats-count {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--tm-navy);
+}
+
+.seats-label {
+  font-size: 12px;
+  color: var(--tm-muted);
+}
+
+.seats-progress {
+  flex: 1;
+  height: 8px;
+  background-color: #dfe8f0;
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.seats-progress-bar {
+  height: 100%;
+  background: var(--tm-cta);
+  border-radius: 100px;
+  transition: width 0.3s ease;
+}
+
+.trip-passengers h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tm-navy);
+  margin: 0 0 8px 0;
+}
+
+.passengers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.passenger-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f6f9fc;
+  border: 1px solid var(--tm-line);
+  border-radius: 10px;
+}
+
+.passenger-item span:first-child {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tm-ink);
+}
+
+.seat-info {
+  font-size: 12px;
+  color: var(--tm-teal-600);
+  font-weight: 700;
+}
+
+.more-passengers {
+  font-size: 12px;
+  color: var(--tm-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 6px;
+}
+
+/* ============ MODAL ============ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 42, 67, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal {
+  background-color: var(--tm-card);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 70px rgba(10, 42, 67, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--tm-line);
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--tm-navy);
+  margin: 0;
+}
+
+.close-btn {
+  background: #f0f5f9;
+  border: none;
+  font-size: 22px;
+  color: var(--tm-muted);
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.close-btn:hover {
+  background-color: #ffe6e6;
+  color: #d64545;
+}
+
+.modal-form {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tm-navy);
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #d5e0ea;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--tm-ink);
+  background-color: white;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--tm-teal);
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.15);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.days-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-btn {
+  padding: 9px 14px;
+  border: 1px solid #d5e0ea;
+  border-radius: 10px;
+  background-color: white;
+  color: var(--tm-ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.day-btn:hover {
+  border-color: var(--tm-teal);
+  color: var(--tm-teal-600);
+}
+
+.day-btn.active {
+  background: var(--tm-cta);
+  border-color: transparent;
+  color: white;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--tm-line);
+}
+
+.cancel-btn {
+  padding: 11px 20px;
+  border: 1px solid #d5e0ea;
+  border-radius: 10px;
+  background-color: white;
+  color: var(--tm-ink);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cancel-btn:hover {
+  background-color: #f6f9fc;
+}
+
+.submit-btn {
+  padding: 11px 22px;
+  border: none;
+  border-radius: 10px;
+  background: var(--tm-cta);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(18, 176, 196, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(18, 176, 196, 0.38);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+  .corporate-trip-management {
+    padding: 16px;
+  }
+
+  .trip-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .create-trip-btn {
+    justify-content: center;
+  }
+
+  .trips-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .days-selector {
+    justify-content: center;
+  }
+}

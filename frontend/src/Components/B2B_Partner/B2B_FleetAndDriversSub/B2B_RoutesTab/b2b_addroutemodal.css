@@ -1,0 +1,463 @@
+.drivemego-btobarm-b2b-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-in;
+  overflow-y: auto;
+}
+
+.drivemego-btobarm-b2b-add-route-modal {
+  background: var(--dmg-card);
+  border-radius: var(--dmg-radius);
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  font-family: var(--dmg-font);
+  box-shadow: var(--dmg-shadow-lg);
+}
+
+.drivemego-btobarm-b2b-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 10;
+}
+
+.drivemego-btobarm-b2b-modal-header h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--dmg-navy);
+  margin: 0;
+}
+
+.drivemego-btobarm-b2b-route-form {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.drivemego-btobarm-b2b-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drivemego-btobarm-b2b-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.drivemego-btobarm-b2b-section-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.drivemego-btobarm-b2b-form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.drivemego-btobarm-b2b-form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drivemego-btobarm-b2b-form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.drivemego-btobarm-b2b-form-group input,
+.drivemego-btobarm-b2b-form-group select,
+.drivemego-btobarm-b2b-form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.drivemego-btobarm-b2b-form-group input:focus,
+.drivemego-btobarm-b2b-form-group select:focus,
+.drivemego-btobarm-b2b-form-group textarea:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.1);
+}
+
+.drivemego-btobarm-b2b-form-group input:disabled,
+.drivemego-btobarm-b2b-form-group select:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.drivemego-btobarm-b2b-form-help {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.drivemego-btobarm-b2b-days-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drivemego-btobarm-b2b-days-selector .drivemego-btobarm-b2b-day-btn {
+  padding: 8px 14px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drivemego-btobarm-b2b-days-selector .drivemego-btobarm-b2b-day-btn:hover {
+  border-color: #12b0c4;
+  color: #12b0c4;
+}
+
+.drivemego-btobarm-b2b-days-selector .drivemego-btobarm-b2b-day-btn.drivemego-btobarm-selected {
+  background: #12b0c4;
+  border-color: #12b0c4;
+  color: #ffffff;
+}
+
+/* Trip Times */
+.drivemego-btobarm-b2b-trip-time-item {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.drivemego-btobarm-b2b-trip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.drivemego-btobarm-b2b-trip-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.drivemego-btobarm-b2b-remove-trip-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fee2e2;
+  border: none;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.drivemego-btobarm-b2b-remove-trip-btn:hover {
+  background: #fecaca;
+}
+
+.drivemego-btobarm-b2b-add-trip-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--dmg-teal-050);
+  border: 2px dashed var(--dmg-teal);
+  border-radius: 10px;
+  color: var(--dmg-teal-700);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.drivemego-btobarm-b2b-add-trip-btn:hover {
+  background: var(--dmg-teal-100);
+}
+
+/* Stop Points */
+.drivemego-btobarm-b2b-stop-points-section {
+  margin-top: 16px;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 16px;
+}
+
+.drivemego-btobarm-b2b-stop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drivemego-btobarm-b2b-stop-title {
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drivemego-btobarm-b2b-stop-title.drivemego-btobarm-outbound {
+  color: #dc2626;
+}
+
+.drivemego-btobarm-b2b-stop-title.drivemego-btobarm-outbound::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: #dc2626;
+  border-radius: 50%;
+}
+
+.drivemego-btobarm-b2b-stop-title.drivemego-btobarm-return {
+  color: #12b0c4;
+}
+
+.drivemego-btobarm-b2b-stop-title.drivemego-btobarm-return::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: #12b0c4;
+  border-radius: 50%;
+}
+
+.drivemego-btobarm-b2b-add-stop-btn {
+  padding: 6px 12px;
+  background: #12b0c4;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.drivemego-btobarm-b2b-add-stop-btn:hover {
+  background: var(--dmg-teal-600);
+}
+
+.drivemego-btobarm-b2b-add-stop-btn.return {
+  background: #12b0c4;
+}
+
+.drivemego-btobarm-b2b-stop-points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drivemego-btobarm-b2b-stop-point-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drivemego-btobarm-b2b-stop-index {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.drivemego-btobarm-b2b-stop-index.drivemego-btobarm-outbound {
+  background: #fbbf24;
+}
+
+.drivemego-btobarm-b2b-stop-index.drivemego-btobarm-return {
+  background: #10b981;
+}
+
+.drivemego-btobarm-b2b-stop-point-row input[type="text"] {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #ffffff;
+  flex: 1;
+  min-width: 150px;
+}
+
+.drivemego-btobarm-b2b-stop-point-row input[type="time"] {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #ffffff;
+  width: 100px;
+}
+
+.drivemego-btobarm-b2b-remove-stop-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fee2e2;
+  border: none;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.drivemego-btobarm-b2b-remove-stop-btn:hover {
+  background: #fecaca;
+}
+
+/* Form Actions */
+.drivemego-btobarm-b2b-form-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.drivemego-btobarm-b2b-cancel-btn {
+  flex: 1;
+  padding: 12px 24px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.drivemego-btobarm-b2b-cancel-btn:hover {
+  background: #f9fafb;
+}
+
+.drivemego-btobarm-b2b-submit-btn {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  background: var(--dmg-cta);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: var(--dmg-cta-shadow);
+  transition: all 0.2s;
+}
+
+.drivemego-btobarm-b2b-submit-btn:hover {
+  background: var(--dmg-cta-hover);
+  transform: translateY(-1px);
+}
+
+.drivemego-btobarm-b2b-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Validation Error Styles */
+.drivemego-btobarm-field-error input,
+.drivemego-btobarm-field-error select,
+.drivemego-btobarm-field-error textarea {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.drivemego-btobarm-field-error label {
+  color: #dc2626;
+}
+
+.drivemego-btobarm-error-text {
+  display: block;
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.drivemego-btobarm-days-error {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .drivemego-btobarm-b2b-add-route-modal {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .drivemego-btobarm-b2b-form-row {
+    flex-direction: column;
+  }
+
+  .drivemego-btobarm-b2b-stop-point-row {
+    flex-wrap: wrap;
+  }
+
+  .drivemego-btobarm-b2b-stop-point-row input[type="text"] {
+    padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #ffffff;
+    flex: 1 1 100%;
+    min-width: unset;
+  }
+
+  .drivemego-btobarm-b2b-stop-point-row input[type="time"] {
+    padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #ffffff;
+    flex: 1;
+    width: auto;
+  }
+}

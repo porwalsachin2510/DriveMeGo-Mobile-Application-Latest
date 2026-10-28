@@ -1,0 +1,1273 @@
+/* .b2b-quotation-request-fleet-quotations-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #12b0c4 0%, #D94545 100%);
+  padding: 80px 20px 40px;
+}
+
+.b2b-quotation-request-fleet-quotations-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.b2b-quotation-request-page-header {
+  margin-bottom: 30px;
+}
+
+.b2b-quotation-request-page-header h1 {
+  font-size: 2.5rem;
+  color: white;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.b2b-quotation-request-page-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+}
+
+.b2b-quotation-request-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.b2b-quotation-request-stat-card {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.b2b-quotation-request-stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.b2b-quotation-request-stat-icon {
+  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #12b0c4 0%, #D94545 100%);
+  flex-shrink: 0;
+}
+
+.b2b-quotation-request-stat-content {
+  flex: 1;
+}
+
+.b2b-quotation-request-stat-content h3 {
+  font-size: 0.95rem;
+  color: #718096;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.b2b-quotation-request-stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2d3748;
+  line-height: 1;
+}
+
+.b2b-quotation-request-stat-card.b2b-quotation-request-total {
+  border-left: 4px solid #12b0c4;
+}
+
+.b2b-quotation-request-stat-card.b2b-quotation-request-pending {
+  border-left: 4px solid #f59e0b;
+}
+
+.b2b-quotation-request-stat-card.b2b-quotation-request-quoted {
+  border-left: 4px solid #10b981;
+}
+
+.b2b-quotation-request-stat-card.b2b-quotation-request-rejected {
+  border-left: 4px solid #ef4444;
+}
+
+.b2b-quotation-request-filter-tabs {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  display: flex;
+  gap: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+}
+
+.b2b-quotation-request-filter-tabs button {
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  color: #718096;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+
+.b2b-quotation-request-filter-tabs button:hover {
+  border-color: #0a2a43;
+  color: #0a2a43;
+  background: rgba(10, 42, 67, 0.05);
+}
+
+.b2b-quotation-request-filter-tabs button.b2b-quotation-request-active {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.b2b-quotation-request-no-quotations {
+  background: white;
+  padding: 80px 40px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.b2b-quotation-request-no-quotations-icon {
+  font-size: 5rem;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.b2b-quotation-request-no-quotations h2 {
+  color: #2d3748;
+  margin-bottom: 10px;
+  font-size: 1.8rem;
+}
+
+.b2b-quotation-request-no-quotations p {
+  color: #718096;
+  font-size: 1.1rem;
+}
+
+
+.b2b-quotation-request-quotations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+
+.b2b-quotation-request-quotation-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.b2b-quotation-request-quotation-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.b2b-quotation-request-quotation-card-header {
+  padding: 20px 25px;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.b2b-quotation-request-quotation-header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.b2b-quotation-request-quotation-number {
+  font-size: 1.4rem;
+  color: #2d3748;
+  margin: 0;
+  font-weight: 700;
+}
+
+.b2b-quotation-request-status-badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.b2b-quotation-request-status-badge.b2b-quotation-request-pending {
+  background: #fef3c7;
+  color: #f59e0b;
+}
+
+.b2b-quotation-request-status-badge.b2b-quotation-request-quoted {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.b2b-quotation-request-status-badge.b2b-quotation-request-rejected {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.b2b-quotation-request-status-badge.b2b-quotation-request-accepted {
+  background: #dbeafe;
+  color: #12b0c4;
+}
+
+.b2b-quotation-request-quotation-date {
+  color: #718096;
+  font-size: 0.95rem;
+}
+
+
+.b2b-quotation-request-quotation-card-body {
+  padding: 25px;
+}
+
+.b2b-quotation-request-info-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.b2b-quotation-request-info-section {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.b2b-quotation-request-info-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.b2b-quotation-request-info-icon {
+  font-size: 1.5rem;
+}
+
+.b2b-quotation-request-info-header h4 {
+  font-size: 1.1rem;
+  color: #2d3748;
+  margin: 0;
+  font-weight: 600;
+}
+
+.b2b-quotation-request-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.b2b-quotation-request-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.b2b-quotation-request-info-item .b2b-quotation-request-label {
+  font-size: 0.9rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+.b2b-quotation-request-info-item .b2b-quotation-request-value {
+  font-size: 0.95rem;
+  color: #2d3748;
+  font-weight: 600;
+  text-align: right;
+}
+
+.b2b-quotation-request-info-item .b2b-quotation-request-value.b2b-quotation-request-email {
+  word-break: break-all;
+}
+
+.b2b-quotation-request-info-item .b2b-quotation-request-value.b2b-quotation-request-highlight {
+  color: #0a2a43;
+  font-size: 1.1rem;
+}
+
+.b2b-quotation-request-quoted-price-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-radius: 8px;
+  border: 2px solid #10b981;
+}
+
+.b2b-quotation-request-price-summary h4 {
+  color: #2d3748;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+}
+
+.b2b-quotation-request-total-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.b2b-quotation-request-total-price span:first-child {
+  font-size: 1.1rem;
+  color: #718096;
+  font-weight: 600;
+}
+
+.b2b-quotation-request-total-price .b2b-quotation-request-amount {
+  font-size: 1.8rem;
+  color: #10b981;
+  font-weight: 700;
+}
+
+.b2b-quotation-request-response-note,
+.b2b-quotation-request-validity-note {
+  margin-top: 10px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #2d3748;
+}
+
+.b2b-quotation-request-quotation-card-footer {
+  padding: 20px 25px;
+  background: #f9fafb;
+  border-top: 2px solid #e2e8f0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+
+.b2b-quotation-request-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  flex: 1;
+  justify-content: center;
+  min-width: 150px;
+}
+
+.b2b-quotation-request-btn-icon {
+  font-size: 1.1rem;
+}
+
+.b2b-quotation-request-btn-primary {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+}
+
+.b2b-quotation-request-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(10, 42, 67, 0.4);
+}
+
+.b2b-quotation-request-btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.b2b-quotation-request-btn-success:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.b2b-quotation-request-btn-secondary {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+.b2b-quotation-request-btn-secondary:hover {
+  background: #cbd5e0;
+}
+
+.b2b-quotation-request-btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.b2b-quotation-request-btn-danger:hover {
+  background: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+
+@media (max-width: 1024px) {
+  .b2b-quotation-request-info-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .b2b-quotation-request-fleet-quotations-page {
+    padding: 60px 15px 30px;
+  }
+
+  .b2b-quotation-request-page-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .b2b-quotation-request-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .b2b-quotation-request-stat-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+  }
+
+  .b2b-quotation-request-stat-value {
+    font-size: 2rem;
+  }
+
+  .b2b-quotation-request-filter-tabs {
+    overflow-x: auto;
+  }
+
+  .b2b-quotation-request-quotation-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .b2b-quotation-request-quotation-card-footer {
+    flex-direction: column;
+  }
+
+  .b2b-quotation-request-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .b2b-quotation-request-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .b2b-quotation-request-info-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .b2b-quotation-request-info-item .b2b-quotation-request-value {
+    text-align: left;
+  }
+} */
+
+.drivermego-b2b-quotation-fleet-quotations-page {
+  min-height: 100vh;
+  padding: 4px;
+  font-family: var(--dmg-font);
+}
+
+.drivermego-b2b-quotation-fleet-quotations-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.drivermego-b2b-quotation-page-header {
+  margin-bottom: 28px;
+}
+
+.drivermego-b2b-quotation-page-header h1 {
+  font-size: 1.9rem;
+  color: var(--dmg-navy);
+  margin-bottom: 8px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.drivermego-b2b-quotation-page-subtitle {
+  color: var(--dmg-muted);
+  font-size: 1rem;
+}
+
+/* Stats Grid */
+.drivermego-b2b-quotation-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.drivermego-b2b-quotation-stat-card {
+  background: var(--dmg-card);
+  padding: 22px;
+  border-radius: var(--dmg-radius);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid var(--dmg-line);
+  box-shadow: var(--dmg-shadow);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
+}
+
+.drivermego-b2b-quotation-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--dmg-shadow-lg);
+  border-color: rgba(18, 176, 196, 0.35);
+}
+
+.drivermego-b2b-quotation-stat-icon {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+  flex-shrink: 0;
+}
+
+.drivermego-b2b-quotation-stat-content {
+  flex: 1;
+}
+
+.drivermego-b2b-quotation-stat-content h3 {
+  font-size: 0.8rem;
+  color: var(--dmg-muted);
+  margin-bottom: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.drivermego-b2b-quotation-stat-value {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-total {
+  border-left: 4px solid var(--dmg-teal);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-pending {
+  border-left: 4px solid var(--warning-color);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-pending .drivermego-b2b-quotation-stat-icon {
+  background: var(--warning-light);
+  color: var(--warning-hover);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-quoted {
+  border-left: 4px solid var(--success-color);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-quoted .drivermego-b2b-quotation-stat-icon {
+  background: var(--success-light);
+  color: var(--success-color);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-rejected {
+  border-left: 4px solid var(--danger-color);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-rejected .drivermego-b2b-quotation-stat-icon {
+  background: var(--danger-light);
+  color: var(--danger-color);
+}
+
+.drivermego-b2b-quotation-stat-card.drivermego-b2b-quotation-accepted {
+  border-left: 4px solid var(--dmg-teal);
+}
+
+/* Advanced Filters Section */
+.drivermego-b2b-quotation-quotation-filters-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.drivermego-b2b-quotation-filters-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.drivermego-b2b-quotation-search-box {
+  flex: 1;
+  min-width: 280px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.drivermego-b2b-quotation-search-icon {
+  position: absolute;
+  left: 14px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.drivermego-b2b-quotation-search-input {
+  width: 100%;
+  padding: 12px 40px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.drivermego-b2b-quotation-search-input:focus {
+  outline: none;
+  border-color: #0a2a43;
+  box-shadow: 0 0 0 3px rgba(10, 42, 67, 0.1);
+}
+
+.drivermego-b2b-quotation-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.drivermego-b2b-quotation-clear-search {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.drivermego-b2b-quotation-clear-search:hover {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.drivermego-b2b-quotation-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.drivermego-b2b-quotation-filter-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drivermego-b2b-quotation-filter-group select {
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #374151;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drivermego-b2b-quotation-filter-group select:focus {
+  outline: none;
+  border-color: #0a2a43;
+}
+
+/* Results Info */
+.drivermego-b2b-quotation-results-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+.drivermego-b2b-quotation-results-count {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Filter Tabs */
+.drivermego-b2b-quotation-filter-tabs {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  display: flex;
+  gap: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+}
+
+.drivermego-b2b-quotation-filter-tabs button {
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  color: #718096;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+
+.drivermego-b2b-quotation-filter-tabs button:hover {
+  border-color: #0a2a43;
+  color: #0a2a43;
+  background: rgba(10, 42, 67, 0.05);
+}
+
+.drivermego-b2b-quotation-filter-tabs button.drivermego-b2b-quotation-active {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+  border-color: transparent;
+}
+
+/* No Quotations */
+.drivermego-b2b-quotation-no-quotations {
+  background: white;
+  padding: 80px 40px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.drivermego-b2b-quotation-no-quotations-icon {
+  font-size: 5rem;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.drivermego-b2b-quotation-no-quotations h2 {
+  color: #2d3748;
+  margin-bottom: 10px;
+  font-size: 1.8rem;
+}
+
+.drivermego-b2b-quotation-no-quotations p {
+  color: #718096;
+  font-size: 1.1rem;
+}
+
+.drivermego-b2b-quotation-no-quotations-icon svg {
+  stroke: #9ca3af;
+}
+
+/* Quotations Table Container */
+.drivermego-b2b-quotation-quotations-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  overflow: auto;
+}
+
+.drivermego-b2b-quotation-quotations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.drivermego-b2b-quotation-quotations-table thead {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: white;
+}
+
+.drivermego-b2b-quotation-quotations-table thead th {
+  padding: 16px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.drivermego-b2b-quotation-quotations-table tbody tr {
+  border-bottom: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.drivermego-b2b-quotation-quotations-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.drivermego-b2b-quotation-quotations-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.drivermego-b2b-quotation-quotations-table tbody td {
+  padding: 16px 14px;
+  vertical-align: middle;
+}
+
+/* Table Cell Styles */
+.drivermego-b2b-quotation-quotation-id-cell .drivermego-b2b-quotation-quotation-id {
+  font-weight: 700;
+  color: #0a2a43;
+  font-size: 0.95rem;
+}
+
+.drivermego-b2b-quotation-customer-cell .drivermego-b2b-quotation-customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drivermego-b2b-quotation-customer-cell .drivermego-b2b-quotation-customer-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.drivermego-b2b-quotation-customer-cell .drivermego-b2b-quotation-customer-company {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.drivermego-b2b-quotation-customer-cell .drivermego-b2b-quotation-customer-email {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.drivermego-b2b-quotation-rental-cell .drivermego-b2b-quotation-rental-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivermego-b2b-quotation-rental-cell .drivermego-b2b-quotation-rental-duration {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.drivermego-b2b-quotation-rental-cell .drivermego-b2b-quotation-rental-dates {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.drivermego-b2b-quotation-vehicles-cell {
+  text-align: center;
+}
+
+.drivermego-b2b-quotation-vehicles-cell .drivermego-b2b-quotation-vehicles-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.drivermego-b2b-quotation-vehicles-cell .drivermego-b2b-quotation-vehicle-count {
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.drivermego-b2b-quotation-vehicles-cell .drivermego-b2b-quotation-vehicle-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drivermego-b2b-quotation-vehicles-cell .drivermego-b2b-quotation-vehicle-types {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.drivermego-b2b-quotation-requirements-cell .drivermego-b2b-quotation-requirements-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivermego-b2b-quotation-requirements-cell .drivermego-b2b-quotation-req-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.drivermego-b2b-quotation-requirements-cell .drivermego-b2b-quotation-req-badge.drivermego-b2b-quotation-yes {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.drivermego-b2b-quotation-requirements-cell .drivermego-b2b-quotation-req-badge.drivermego-b2b-quotation-no {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.drivermego-b2b-quotation-amount-cell .drivermego-b2b-quotation-amount-value {
+  font-weight: 700;
+  color: #059669;
+  font-size: 1rem;
+}
+
+.drivermego-b2b-quotation-amount-cell .drivermego-b2b-quotation-amount-pending {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.drivermego-b2b-quotation-status-cell .drivermego-b2b-quotation-status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.drivermego-b2b-quotation-status-badge.drivermego-b2b-quotation-pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.drivermego-b2b-quotation-status-badge.drivermego-b2b-quotation-quoted {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.drivermego-b2b-quotation-status-badge.drivermego-b2b-quotation-rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.drivermego-b2b-quotation-status-badge.drivermego-b2b-quotation-accepted {
+  background: #dbeafe;
+  color: #0e97a8;
+}
+
+.drivermego-b2b-quotation-status-badge.drivermego-b2b-quotation-negotiating {
+  background: #fae8ff;
+  color: #a855f7;
+}
+
+.drivermego-b2b-quotation-status-badge.drivermego-b2b-quotation-expired {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.drivermego-b2b-quotation-date-cell {
+  text-align: center;
+}
+
+.drivermego-b2b-quotation-date-cell .drivermego-b2b-quotation-request-date {
+  display: block;
+  font-weight: 500;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.drivermego-b2b-quotation-date-cell .drivermego-b2b-quotation-request-time {
+  display: block;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-view-btn {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+}
+
+.drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(10, 42, 67, 0.4);
+}
+
+.drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-quote-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-quote-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* Pagination */
+.drivermego-b2b-quotation-pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.drivermego-b2b-quotation-pagination-info {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.drivermego-b2b-quotation-pagination-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.drivermego-b2b-quotation-pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drivermego-b2b-quotation-pagination-btn:hover:not(:disabled) {
+  border-color: #0a2a43;
+  color: #0a2a43;
+  background: #f0f4ff;
+}
+
+.drivermego-b2b-quotation-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.drivermego-b2b-quotation-pagination-btn.drivermego-b2b-quotation-page-number.drivermego-b2b-quotation-active {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+  border-color: transparent;
+}
+
+/* Responsive Table */
+@media (max-width: 1200px) {
+  .drivermego-b2b-quotation-quotations-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 768px) {
+  .drivermego-b2b-quotation-filters-row {
+    flex-direction: column;
+  }
+
+  .drivermego-b2b-quotation-search-box {
+    width: 100%;
+  }
+
+  .drivermego-b2b-quotation-filter-group {
+    width: 100%;
+  }
+
+  .drivermego-b2b-quotation-pagination-container {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-action-btn span {
+    display: none;
+  }
+
+  .drivermego-b2b-quotation-actions-cell .drivermego-b2b-quotation-action-btn {
+    padding: 8px;
+  }
+}
+
+/* Buttons */
+.drivermego-b2b-quotation-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  flex: 1;
+  justify-content: center;
+  min-width: 150px;
+}
+
+.drivermego-b2b-quotation-btn-icon {
+  font-size: 1.1rem;
+}
+
+.drivermego-b2b-quotation-btn-primary {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+}
+
+.drivermego-b2b-quotation-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(10, 42, 67, 0.4);
+}
+
+.drivermego-b2b-quotation-btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.drivermego-b2b-quotation-btn-success:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.drivermego-b2b-quotation-btn-secondary {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+.drivermego-b2b-quotation-btn-secondary:hover {
+  background: #cbd5e0;
+}
+
+.drivermego-b2b-quotation-btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.drivermego-b2b-quotation-btn-danger:hover {
+  background: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .drivermego-b2b-quotation-info-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .drivermego-b2b-quotation-fleet-quotations-page {
+    padding: 60px 15px 30px;
+  }
+
+  .drivermego-b2b-quotation-page-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .drivermego-b2b-quotation-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .drivermego-b2b-quotation-stat-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+  }
+
+  .drivermego-b2b-quotation-stat-value {
+    font-size: 2rem;
+  }
+
+  .drivermego-b2b-quotation-filter-tabs {
+    overflow-x: auto;
+  }
+
+  .drivermego-b2b-quotation-quotation-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .drivermego-b2b-quotation-quotation-card-footer {
+    flex-direction: column;
+  }
+
+  .drivermego-b2b-quotation-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .drivermego-b2b-quotation-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivermego-b2b-quotation-info-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .drivermego-b2b-quotation-info-item .drivermego-b2b-quotation-value {
+    text-align: left;
+  }
+}

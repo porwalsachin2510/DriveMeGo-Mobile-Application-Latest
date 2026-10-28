@@ -1,0 +1,782 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================================
+   DriveMeGo — Corporate Employee Bookings
+   Rebuilt on the brand system (deep navy + brand teal) to match the
+   redesigned Commuter Home, Login and Register screens.
+   ===================================================================== */
+
+:root {
+  --dmg-navy: #0a2a43;
+  --dmg-navy-700: #123a58;
+  --dmg-teal: #12b0c4;
+  --dmg-teal-600: #0e97a8;
+  --dmg-teal-050: #e6f7fa;
+  --dmg-cta: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  --dmg-amber: #f6a723;
+  --dmg-bg: #eef3f8;
+  --dmg-card: #ffffff;
+  --dmg-ink: #0f2233;
+  --dmg-muted: #5b6b7b;
+  --dmg-muted-2: #8598a8;
+  --dmg-line: #e4ecf3;
+  --dmg-shadow: 0 10px 30px rgba(10, 42, 67, 0.08);
+  --dmg-radius: 20px;
+  --dmg-radius-sm: 12px;
+  --dmg-font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.drivemego-cebp-corporate-bookings-page {
+  min-height: 100vh;
+  background-color: var(--dmg-bg);
+  font-family: var(--dmg-font);
+  color: var(--dmg-ink);
+}
+
+.drivemego-cebp-bookings-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+/* ============ HERO HEADER ============ */
+.drivemego-cebp-bookings-header {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding: 34px 32px;
+  border-radius: 26px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(900px 320px at 85% -20%, rgba(18, 176, 196, 0.34), transparent 60%),
+    linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 58%, #0e3350 100%);
+}
+
+.drivemego-cebp-bookings-header::after {
+  content: "";
+  position: absolute;
+  right: -110px;
+  top: -130px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(18, 176, 196, 0.32);
+  z-index: -1;
+}
+
+.drivemego-cebp-header-content h1 {
+  font-size: clamp(24px, 3.4vw, 32px);
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.drivemego-cebp-header-content p {
+  color: rgba(226, 238, 246, 0.82);
+  font-size: 15px;
+}
+
+.drivemego-cebp-header-stats {
+  display: flex;
+  gap: 14px;
+}
+
+.drivemego-cebp-stat-card {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  padding: 16px 26px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.drivemego-cebp-stat-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--dmg-teal);
+  line-height: 1;
+}
+
+.drivemego-cebp-stat-label {
+  font-size: 11px;
+  color: rgba(226, 238, 246, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ============ FILTERS ============ */
+.drivemego-cebp-filters-section {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding: 18px 20px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: var(--dmg-radius-sm);
+  box-shadow: 0 2px 10px rgba(10, 42, 67, 0.05);
+}
+
+.drivemego-cebp-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drivemego-cebp-filter-group label {
+  font-size: 12px;
+  color: var(--dmg-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.drivemego-cebp-filter-select,
+.drivemego-cebp-filter-input {
+  padding: 11px 16px;
+  border: 1.5px solid var(--dmg-line);
+  border-radius: 11px;
+  font-size: 14px;
+  font-family: inherit;
+  min-width: 190px;
+  background: var(--dmg-card);
+  color: var(--dmg-ink);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.drivemego-cebp-filter-select:focus,
+.drivemego-cebp-filter-input:focus {
+  outline: none;
+  border-color: var(--dmg-teal);
+  box-shadow: 0 0 0 4px rgba(18, 176, 196, 0.12);
+}
+
+.drivemego-cebp-clear-filter-btn {
+  padding: 11px 18px;
+  background: #eef3f8;
+  border: 1px solid var(--dmg-line);
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--dmg-navy);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.drivemego-cebp-clear-filter-btn:hover {
+  background: #e2ebf3;
+}
+
+/* ============ LOADING / EMPTY ============ */
+.drivemego-cebp-loading-state,
+.drivemego-cebp-empty-state {
+  text-align: center;
+  padding: 64px 20px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: var(--dmg-radius);
+  box-shadow: var(--dmg-shadow);
+  color: var(--dmg-muted);
+}
+
+.drivemego-cebp-spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid var(--dmg-teal-050);
+  border-top-color: var(--dmg-teal);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.drivemego-cebp-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+}
+
+.drivemego-cebp-empty-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.drivemego-cebp-empty-state p {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+  margin: 0;
+}
+
+.drivemego-cebp-empty-subtitle {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--dmg-muted) !important;
+  margin-top: 8px !important;
+}
+
+/* ============ EMPLOYEE BOOKINGS LIST ============ */
+.drivemego-cebp-employee-bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.drivemego-cebp-employee-section {
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: var(--dmg-radius);
+  overflow: hidden;
+  box-shadow: var(--dmg-shadow);
+}
+
+.drivemego-cebp-employee-header-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background:
+    radial-gradient(600px 200px at 90% -40%, rgba(18, 176, 196, 0.28), transparent 60%),
+    linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 100%);
+  color: #fff;
+}
+
+.drivemego-cebp-employee-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--dmg-cta);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(18, 176, 196, 0.35);
+}
+
+.drivemego-cebp-employee-info {
+  flex: 1;
+}
+
+.drivemego-cebp-employee-info h3 {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.drivemego-cebp-employee-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drivemego-cebp-meta-tag {
+  font-size: 12px;
+  color: #cdeef3;
+  background: rgba(18, 176, 196, 0.18);
+  border: 1px solid rgba(18, 176, 196, 0.3);
+  padding: 4px 11px;
+  border-radius: 100px;
+}
+
+.drivemego-cebp-employee-booking-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+}
+
+.drivemego-cebp-employee-booking-count .drivemego-cebp-count-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--dmg-teal);
+}
+
+.drivemego-cebp-employee-booking-count .drivemego-cebp-count-label {
+  font-size: 11px;
+  color: rgba(226, 238, 246, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============ EMPLOYEE BOOKINGS CARDS ============ */
+.drivemego-cebp-employee-bookings {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drivemego-cebp-booking-card-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-cebp-booking-card {
+  background: #f9fbfd;
+  border: 1px solid var(--dmg-line);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.drivemego-cebp-booking-card:hover {
+  border-color: rgba(18, 176, 196, 0.5);
+  box-shadow: 0 8px 22px rgba(18, 176, 196, 0.14);
+  transform: translateY(-2px);
+}
+
+.drivemego-cebp-booking-card.drivemego-cebp-expanded {
+  border-color: var(--dmg-teal);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.drivemego-cebp-booking-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--dmg-card);
+  border-bottom: 1px solid var(--dmg-line);
+  flex-wrap: wrap;
+}
+
+.drivemego-cebp-booking-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drivemego-cebp-booking-id {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+}
+
+.drivemego-cebp-status-badge {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.drivemego-cebp-pass-badge {
+  padding: 4px 11px;
+  background: var(--dmg-navy);
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #cdeef3;
+  text-transform: uppercase;
+}
+
+.drivemego-cebp-trip-type-badge {
+  padding: 4px 11px;
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.drivemego-cebp-booking-date {
+  font-size: 12px;
+  color: var(--dmg-muted-2);
+  font-weight: 600;
+}
+
+.drivemego-cebp-booking-card-body {
+  padding: 20px;
+}
+
+/* ============ ROUTE VISUAL ============ */
+.drivemego-cebp-route-section {
+  margin-bottom: 20px;
+}
+
+.drivemego-cebp-route-visual {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.drivemego-cebp-route-point {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.drivemego-cebp-point-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.drivemego-cebp-point-marker.drivemego-cebp-pickup {
+  background: var(--dmg-teal);
+  box-shadow: 0 0 0 4px rgba(18, 176, 196, 0.2);
+}
+
+.drivemego-cebp-point-marker.dropoff,
+.drivemego-cebp-point-marker.drivemego-cebp-dropoff {
+  background: var(--dmg-amber);
+  box-shadow: 0 0 0 4px rgba(246, 167, 35, 0.22);
+}
+
+.drivemego-cebp-point-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-cebp-point-label {
+  font-size: 11px;
+  color: var(--dmg-muted-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.drivemego-cebp-point-location {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+}
+
+.drivemego-cebp-route-connector {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.drivemego-cebp-connector-line {
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--dmg-teal) 0%, var(--dmg-amber) 100%);
+  border-radius: 2px;
+}
+
+/* ============ BOOKING DETAILS GRID ============ */
+.drivemego-cebp-booking-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.drivemego-cebp-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--dmg-card);
+  border-radius: 12px;
+  border: 1px solid var(--dmg-line);
+}
+
+.drivemego-cebp-detail-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+}
+
+.drivemego-cebp-detail-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.drivemego-cebp-detail-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-cebp-detail-label {
+  font-size: 11px;
+  color: var(--dmg-muted-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.drivemego-cebp-detail-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+}
+
+/* ============ TRIPS TOGGLE ============ */
+.drivemego-cebp-trips-toggle {
+  display: flex;
+  justify-content: center;
+  padding-top: 14px;
+  border-top: 1px dashed var(--dmg-line);
+}
+
+.drivemego-cebp-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background: transparent;
+  border: 1.5px solid var(--dmg-teal);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dmg-teal-600);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.drivemego-cebp-toggle-btn:hover {
+  background: var(--dmg-teal);
+  color: white;
+}
+
+.drivemego-cebp-toggle-arrow {
+  font-size: 9px;
+  transition: transform 0.2s ease;
+}
+
+/* ============ TRIPS SECTION ============ */
+.drivemego-cebp-trips-section {
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-teal);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+
+.drivemego-cebp-trips-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: var(--dmg-teal-050);
+  border-bottom: 1px solid var(--dmg-line);
+}
+
+.drivemego-cebp-trips-header h4 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  margin: 0;
+}
+
+.drivemego-cebp-trips-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.drivemego-cebp-trip-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--dmg-line);
+  transition: background 0.2s ease;
+}
+
+.drivemego-cebp-trip-item:last-child {
+  border-bottom: none;
+}
+
+.drivemego-cebp-trip-item:hover {
+  background: #f7fbfc;
+}
+
+.drivemego-cebp-trip-date-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 54px;
+  padding: 8px;
+  background: var(--dmg-teal-050);
+  border-radius: 12px;
+}
+
+.drivemego-cebp-trip-day {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dmg-teal-600);
+  text-transform: uppercase;
+}
+
+.drivemego-cebp-trip-date-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  line-height: 1;
+}
+
+.drivemego-cebp-trip-month {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dmg-muted);
+  text-transform: uppercase;
+}
+
+.drivemego-cebp-trip-details {
+  flex: 1;
+}
+
+.drivemego-cebp-trip-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+  margin-bottom: 5px;
+}
+
+.drivemego-cebp-trip-from {
+  color: var(--dmg-teal-600);
+}
+
+.drivemego-cebp-trip-arrow {
+  color: var(--dmg-muted-2);
+}
+
+.drivemego-cebp-trip-to {
+  color: #b57d10;
+}
+
+.drivemego-cebp-trip-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drivemego-cebp-trip-time,
+.drivemego-cebp-trip-direction,
+.drivemego-cebp-trip-driver {
+  font-size: 12px;
+  color: var(--dmg-muted);
+  padding: 3px 10px;
+  background: #eef3f8;
+  border-radius: 100px;
+  font-weight: 600;
+}
+
+.drivemego-cebp-trip-status {
+  flex-shrink: 0;
+}
+
+.drivemego-cebp-trip-status-badge {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+  .drivemego-cebp-bookings-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 26px 22px;
+  }
+
+  .drivemego-cebp-header-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .drivemego-cebp-stat-card {
+    flex: 1;
+  }
+
+  .drivemego-cebp-employee-header-card {
+    flex-wrap: wrap;
+  }
+
+  .drivemego-cebp-employee-booking-count {
+    width: 100%;
+    margin-top: 12px;
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .drivemego-cebp-route-visual {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .drivemego-cebp-route-connector {
+    padding: 8px 0;
+  }
+
+  .drivemego-cebp-connector-line {
+    width: 3px;
+    height: 30px;
+    background: linear-gradient(180deg, var(--dmg-teal) 0%, var(--dmg-amber) 100%);
+  }
+
+  .drivemego-cebp-booking-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-cebp-trip-item {
+    flex-wrap: wrap;
+  }
+
+  .drivemego-cebp-trip-details {
+    width: calc(100% - 70px);
+  }
+
+  .drivemego-cebp-trip-status {
+    width: 100%;
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+  }
+}

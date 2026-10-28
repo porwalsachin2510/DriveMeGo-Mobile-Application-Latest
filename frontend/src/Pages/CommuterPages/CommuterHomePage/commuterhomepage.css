@@ -1,0 +1,461 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================================
+   DriveMeGo — Commuter Home Page
+   Modern, IndiGo-inspired redesign built on the brand's logo palette:
+   deep navy + bright teal/cyan. Primary CTAs use the brand teal (the
+   logo has no red), rendered as a subtle gradient for depth.
+   ===================================================================== */
+
+:root {
+  --dmg-navy: #0a2a43;
+  --dmg-navy-700: #123a58;
+  --dmg-navy-600: #1c4d70;
+  --dmg-teal: #12b0c4;
+  --dmg-teal-600: #0e97a8;
+  --dmg-teal-050: #e6f7fa;
+  /* Primary action color = brand teal (kept under the legacy token names
+     so every existing CTA reference picks it up). The logo has no red. */
+  --dmg-coral: #12b0c4;
+  --dmg-coral-600: #0e97a8;
+  --dmg-coral-050: #e6f7fa;
+  --dmg-cta: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  --dmg-cta-hover: linear-gradient(135deg, #12b0c4 0%, #0c8695 100%);
+  --dmg-cta-shadow: 0 12px 26px rgba(18, 176, 196, 0.30);
+  --dmg-cta-shadow-lg: 0 16px 34px rgba(18, 176, 196, 0.38);
+  --dmg-amber: #f6a723;
+  --dmg-bg: #eef3f8;
+  --dmg-card: #ffffff;
+  --dmg-ink: #0f2233;
+  --dmg-muted: #5b6b7b;
+  --dmg-muted-2: #8598a8;
+  --dmg-line: #e4ecf3;
+  --dmg-shadow: 0 10px 30px rgba(10, 42, 67, 0.08);
+  --dmg-shadow-lg: 0 24px 60px rgba(10, 42, 67, 0.16);
+  --dmg-radius: 20px;
+  --dmg-radius-sm: 12px;
+  --dmg-font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--dmg-font);
+  background-color: var(--dmg-bg);
+  color: var(--dmg-ink);
+}
+
+.commuterhomepage-homepage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--dmg-bg);
+}
+
+.commuterhomepage-commuters-container {
+  flex: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 64px;
+  width: 100%;
+}
+
+.commuterhomepage-already-requested {
+  width: 100%;
+  max-width: 1200px;
+  margin: 24px auto;
+}
+
+.commuterhomepage-already-requested:has(.arr) {
+  padding: 20px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: var(--dmg-radius-sm);
+}
+
+/* ============ HERO ============ */
+.commuterhomepage-hero {
+  position: relative;
+  margin: 20px 0 0;
+  border-radius: 28px;
+  padding: 56px 32px 120px;
+  overflow: hidden;
+  background:
+    radial-gradient(1100px 380px at 82% -12%, rgba(18, 176, 196, 0.35), transparent 60%),
+    radial-gradient(760px 360px at 8% 120%, rgba(18, 176, 196, 0.16), transparent 60%),
+    linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 55%, #0e3350 100%);
+  isolation: isolate;
+}
+
+/* subtle "road" arc echoing the logo mark */
+.commuterhomepage-hero::after {
+  content: "";
+  position: absolute;
+  right: -120px;
+  top: -140px;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(18, 176, 196, 0.35);
+  z-index: -1;
+}
+
+.commuterhomepage-hero-inner {
+  max-width: 720px;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.commuterhomepage-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #bff0f6;
+  background: rgba(18, 176, 196, 0.14);
+  border: 1px solid rgba(18, 176, 196, 0.35);
+  padding: 7px 14px;
+  border-radius: 100px;
+  margin-bottom: 20px;
+}
+
+.commuterhomepage-hero-eyebrow svg {
+  width: 15px;
+  height: 15px;
+}
+
+.commuterhomepage-page-title h1 {
+  font-size: clamp(30px, 5vw, 46px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+
+.commuterhomepage-page-title h1 .highlight,
+.commuterhomepage-hero-accent {
+  color: var(--dmg-teal);
+}
+
+.commuterhomepage-page-title p {
+  font-size: 16px;
+  line-height: 1.65;
+  color: rgba(226, 238, 246, 0.82);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.commuterhomepage-location-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #eaf6f8;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 8px 16px;
+  border-radius: 100px;
+  backdrop-filter: blur(6px);
+}
+
+.commuterhomepage-location-indicator strong {
+  color: var(--dmg-teal);
+}
+
+.commuterhomepage-location-indicator svg {
+  width: 15px;
+  height: 15px;
+  color: var(--dmg-coral);
+}
+
+/* pull the search card up so it floats over the hero (IndiGo style) */
+.commuterhomepage-commuters-container .cmf-widget {
+  margin-top: -90px;
+  margin-bottom: 52px;
+  position: relative;
+  z-index: 5;
+}
+
+/* ============ AVAILABLE SECTION WRAPPER ============ */
+.commuterhomepage-available-section-wrapper {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.commuterhomepage-available-section-wrapper > .campaign-banner-container.sidebar {
+  order: 2;
+}
+
+.commuterhomepage-available-section-wrapper > *:not(.campaign-banner-container.sidebar) {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .commuterhomepage-available-section-wrapper {
+    flex-direction: column;
+  }
+
+  .commuterhomepage-available-section-wrapper > .campaign-banner-container.sidebar {
+    width: 100%;
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .commuterhomepage-commuters-container {
+    padding: 0 14px 40px;
+  }
+
+  .commuterhomepage-hero {
+    padding: 40px 20px 116px;
+    border-radius: 22px;
+  }
+
+  .commuterhomepage-commuters-container .cmf-widget {
+    margin-top: -96px;
+  }
+}
+
+/* ============ HIGHLIGHTS STRIP (Why Drive Me Go) ============ */
+.commuterhomepage-highlights {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 2px 0 44px;
+}
+
+.commuterhomepage-highlight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 18px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(10, 42, 67, 0.05);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.commuterhomepage-highlight-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(18, 176, 196, 0.4);
+  box-shadow: var(--dmg-shadow);
+}
+
+.commuterhomepage-highlight-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  color: var(--dmg-teal-600);
+  background: var(--dmg-teal-050);
+}
+
+.commuterhomepage-highlight-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.commuterhomepage-highlight-text h3 {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  margin: 2px 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.commuterhomepage-highlight-text p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dmg-muted);
+  margin: 0;
+}
+
+/* ============ STATS / TRUST BAND ============ */
+.commuterhomepage-stats {
+  margin: 8px 0 24px;
+  border-radius: 28px;
+  padding: 44px 32px;
+  color: #fff;
+  overflow: hidden;
+  background:
+    radial-gradient(760px 320px at 88% -22%, rgba(18, 176, 196, 0.34), transparent 60%),
+    radial-gradient(560px 300px at 6% 130%, rgba(18, 176, 196, 0.14), transparent 60%),
+    linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 58%, #0e3350 100%);
+  text-align: center;
+}
+
+.commuterhomepage-stats-head h2 {
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+
+.commuterhomepage-stats-head p {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: rgba(226, 238, 246, 0.82);
+  margin: 0 auto 32px;
+  max-width: 580px;
+}
+
+.commuterhomepage-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.commuterhomepage-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+}
+
+.commuterhomepage-stat + .commuterhomepage-stat::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 22%;
+  bottom: 22%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.commuterhomepage-stat-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--dmg-teal);
+  letter-spacing: -0.02em;
+}
+
+.commuterhomepage-stat-star {
+  width: 22px;
+  height: 22px;
+  color: var(--dmg-amber);
+}
+
+.commuterhomepage-stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(226, 238, 246, 0.85);
+}
+
+/* ============ REQUEST-A-ROUTE CTA BAND ============ */
+.commuterhomepage-cta-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 24px 0 8px;
+  padding: 28px 32px;
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(18, 176, 196, 0.08), rgba(18, 176, 196, 0)) ,
+    var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  box-shadow: var(--dmg-shadow);
+}
+
+.commuterhomepage-cta-text h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.commuterhomepage-cta-text p {
+  font-size: 14px;
+  color: var(--dmg-muted);
+  margin: 0;
+}
+
+.commuterhomepage-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 26px;
+  border: none;
+  border-radius: 14px;
+  background: var(--dmg-cta);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: var(--dmg-cta-shadow);
+  transition: all 0.2s ease;
+}
+
+.commuterhomepage-cta-btn:hover {
+  background: var(--dmg-cta-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--dmg-cta-shadow-lg);
+}
+
+.commuterhomepage-cta-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 900px) {
+  .commuterhomepage-highlights {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .commuterhomepage-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px 16px;
+  }
+
+  .commuterhomepage-stat::before {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .commuterhomepage-highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .commuterhomepage-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .commuterhomepage-cta-band {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .commuterhomepage-cta-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,375 @@
+/* =====================================================================
+   DriveMeGo — B2C Partner Driver Card (premium, brand-aligned)
+   ===================================================================== */
+.b2c-driver-card {
+  background: var(--dmg-card, #ffffff);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--dmg-shadow-sm, 0 2px 10px rgba(10, 42, 67, 0.05));
+  border: 1px solid var(--dmg-line, #e4ecf3);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--dmg-font, "Plus Jakarta Sans", sans-serif);
+}
+
+.b2c-driver-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--dmg-shadow, 0 10px 30px rgba(10, 42, 67, 0.08));
+  border-color: var(--dmg-teal-100, #d1eff4);
+}
+
+/* ---------- Header band ---------- */
+.b2c-driver-header {
+  padding: 18px 20px 20px;
+  background: var(--dmg-navy-grad, linear-gradient(135deg, #0a2a43 0%, #123a58 55%, #0e3350 100%));
+  color: #fff;
+  position: relative;
+}
+
+.b2c-driver-badges {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.b2c-availability-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.b2c-availability-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: b2c-pulse 2s infinite;
+}
+
+@keyframes b2c-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.b2c-status-text {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.b2c-status-text[data-status="INACTIVE"],
+.b2c-status-text[data-status="ON_LEAVE"] {
+  background: rgba(246, 167, 35, 0.9);
+  border-color: transparent;
+}
+
+.b2c-driver-identity {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.b2c-driver-image {
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+.b2c-driver-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.b2c-driver-initials {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+.b2c-driver-header-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.b2c-driver-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.b2c-contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.b2c-contact-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: rgba(226, 240, 248, 0.9);
+  font-weight: 500;
+  min-width: 0;
+}
+
+.b2c-contact-line svg {
+  flex-shrink: 0;
+  color: #7fe3ef;
+}
+
+.b2c-contact-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Detail grid (2 x 2) ---------- */
+.b2c-driver-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 18px 20px;
+}
+
+.b2c-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--dmg-bg, #eef3f8);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  min-width: 0;
+}
+
+.b2c-detail-item:hover {
+  background: var(--dmg-teal-050, #e6f7fa);
+  border-color: var(--dmg-teal-100, #d1eff4);
+}
+
+.b2c-detail-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--dmg-teal-600, #0e97a8);
+  box-shadow: var(--dmg-shadow-sm, 0 2px 10px rgba(10, 42, 67, 0.05));
+}
+
+.b2c-detail-ico-star {
+  color: var(--dmg-amber, #f6a723);
+}
+
+.b2c-detail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.b2c-detail-label {
+  font-size: 10.5px;
+  color: var(--dmg-muted, #5b6b7b);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.b2c-detail-value {
+  font-size: 13px;
+  color: var(--dmg-navy, #0a2a43);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Availability window ---------- */
+.b2c-availability-window-section {
+  margin: 0 20px 18px;
+  padding: 12px 14px;
+  background: var(--dmg-teal-050, #e6f7fa);
+  border: 1px solid var(--dmg-teal-100, #d1eff4);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.b2c-completed-trips,
+.b2c-in-progress-trip,
+.b2c-next-trip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.b2c-section-label {
+  color: var(--dmg-muted, #5b6b7b);
+  font-weight: 600;
+}
+
+.b2c-completed-count {
+  background: var(--dmg-green, #16a34a);
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.b2c-in-progress-trip {
+  background: #fef4e2;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #f7dca0;
+  width: 100%;
+}
+
+.b2c-in-progress-trip .b2c-section-label {
+  color: #b45309;
+}
+
+.b2c-trip-info {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.b2c-trip-time {
+  background: var(--dmg-teal, #12b0c4);
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.b2c-trip-route {
+  color: var(--dmg-ink, #0f2233);
+  font-weight: 600;
+}
+
+.b2c-time-until {
+  color: var(--dmg-muted, #5b6b7b);
+  font-style: italic;
+  font-size: 11px;
+}
+
+.b2c-availability-window-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--dmg-teal-700, #0c8695);
+}
+
+.b2c-availability-window-msg svg {
+  flex-shrink: 0;
+}
+
+.b2c-window-text {
+  color: var(--dmg-teal-700, #0c8695);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ---------- Actions ---------- */
+.b2c-driver-actions {
+  margin-top: auto;
+  padding: 16px 20px 18px;
+  border-top: 1px solid var(--dmg-line-2, #eef2f7);
+  display: flex;
+  gap: 12px;
+  background: #fff;
+}
+
+.b2c-action-btn {
+  flex: 1;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.b2c-action-btn svg {
+  flex-shrink: 0;
+}
+
+.b2c-edit-btn {
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(18, 176, 196, 0.28);
+}
+
+.b2c-edit-btn:hover {
+  background: linear-gradient(135deg, #12b0c4 0%, #0c8695 100%);
+}
+
+.b2c-delete-btn {
+  background: #fdecec;
+  color: #dc2626;
+  border-color: #f7c9c9;
+}
+
+.b2c-delete-btn:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
+.b2c-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .b2c-driver-details-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,288 @@
+"use client";
+
+import { getActiveCurrency } from "../../../../config/localeConfig";
+import { useState, useEffect, useCallback } from "react";
+import { useSelector } from "react-redux";
+import "./AdminEarningsPayments.css";
+import api from "../../../../utils/api";
+
+const ICONS = {
+  revenue: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  bookings: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  commission: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="6 3 18 3 22 9 12 22 2 9 6 3" /><path d="M2 9h20" /><path d="M12 22 8.5 9 12 3l3.5 6L12 22" />
+    </svg>
+  ),
+  payouts: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  ),
+};
+
+function AdminEarningsPayments() {
+  const [earnings, setEarnings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [periodFilter, setPeriodFilter] = useState("monthly");
+  const [providerFilter, setProviderFilter] = useState("all");
+
+  // The admin's selected display currency. Subscribing here means the component
+  // re-renders (and re-fetches via the effect below) the instant the admin
+  // switches currency — no manual page refresh needed.
+  const activeCurrency = useSelector((state) => state.locale?.currency);
+
+  const fetchEarnings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("/admin/b2c/earnings-payments", {
+        params: {
+          period: periodFilter,
+          providerId: providerFilter !== "all" ? providerFilter : undefined,
+        },
+      });
+      setEarnings(response.data.earnings);
+    } catch (error) {
+      console.error("Error fetching earnings:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [periodFilter, providerFilter, activeCurrency]);
+
+  useEffect(() => {
+    fetchEarnings();
+  }, [fetchEarnings]);
+
+  const formatCurrency = (amount, currency) => {
+    const cur = currency || activeCurrency || getActiveCurrency();
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: cur,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="ad-dash-earnings-payments">
+        <div className="loading">Loading earnings data...</div>
+      </div>
+    );
+  }
+
+  if (!earnings) {
+    return (
+      <div className="ad-dash-earnings-payments">
+        <div className="error">Failed to load earnings data</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ad-dash-earnings-payments">
+      <div className="ad-dash-ep-header">
+        <div>
+          <h3 className="ad-dash-ep-title">Earnings & Payments</h3>
+          <p className="ad-dash-ep-subtitle">
+            Track B2C revenue, commissions, and provider payouts.
+          </p>
+        </div>
+      </div>
+
+      <div className="ad-dash-ep-filters">
+        <select
+          value={periodFilter}
+          onChange={(e) => setPeriodFilter(e.target.value)}
+        >
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+        <select
+          value={providerFilter}
+          onChange={(e) => setProviderFilter(e.target.value)}
+        >
+          <option value="all">All Providers</option>
+          {earnings.topProviders?.map((provider) => (
+            <option key={provider.providerId} value={provider.providerId}>
+              {provider.providerName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="ad-dash-ep-summary">
+        <div className="summary-card revenue">
+          <div className="summary-icon">💰</div>
+          <div className="summary-content">
+            <h4>Total Revenue</h4>
+            <span className="summary-value">
+              {formatCurrency(earnings.totalRevenue)}
+            </span>
+            <span className="summary-change">+12.5% from last period</span>
+          </div>
+        </div>
+
+        <div className="summary-card bookings">
+          <div className="summary-icon">📊</div>
+          <div className="summary-content">
+            <h4>Total Bookings</h4>
+            <span className="summary-value">
+              {earnings.totalBookings.toLocaleString()}
+            </span>
+            <span className="summary-change">+8.3% from last period</span>
+          </div>
+        </div>
+
+        <div className="summary-card commission">
+          <div className="summary-icon">💎</div>
+          <div className="summary-content">
+            <h4>Commission Earned</h4>
+            <span className="summary-value">
+              {formatCurrency(earnings.commissionEarned)}
+            </span>
+            <span className="summary-change">10% of revenue</span>
+          </div>
+        </div>
+
+        <div className="summary-card payouts">
+          <div className="summary-icon">💸</div>
+          <div className="summary-content">
+            <h4>Provider Payouts</h4>
+            <span className="summary-value">
+              {formatCurrency(earnings.providerPayouts)}
+            </span>
+            <span className="summary-change">90% of revenue</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Stats */}
+      <div className="ad-dash-ep-stats">
+        <div className="stat-item">
+          <span className="stat-label">Average Fare</span>
+          <span className="stat-value">
+            {formatCurrency(earnings.averageFare)}
+          </span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Pending Payouts</span>
+          <span className="stat-value pending">
+            {formatCurrency(earnings.pendingPayouts)}
+          </span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Completed Payouts</span>
+          <span className="stat-value completed">
+            {formatCurrency(earnings.completedPayouts)}
+          </span>
+        </div>
+      </div>
+
+      {/* Recent Transactions */}
+      {earnings.transactions && earnings.transactions.length > 0 && (
+        <div className="ad-dash-ep-breakdown">
+          <h4>Recent Transactions</h4>
+          <div className="breakdown-chart">
+            {earnings.transactions.map((txn, index) => (
+              <div key={txn._id || index} className="breakdown-item">
+                <div className="breakdown-header">
+                  <span className="breakdown-period">
+                    {txn.providerName || "Unknown"}
+                  </span>
+                  <span className="breakdown-revenue">
+                    {formatCurrency(txn.amount || 0)}
+                  </span>
+                </div>
+                <div className="breakdown-details">
+                  <div className="detail-item">
+                    <span className="detail-label">Type:</span>
+                    <span className="detail-value">
+                      {(txn.type || "").replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Status:</span>
+                    <span className="detail-value">{txn.status}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Date:</span>
+                    <span className="detail-value">
+                      {txn.date ? formatDate(txn.date) : "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top Providers */}
+      <div className="ad-dash-ep-providers">
+        <h4>Top Performing Providers</h4>
+        <div className="providers-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Revenue</th>
+                <th>Bookings</th>
+                <th>Commission</th>
+                <th>Performance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {earnings.topProviders?.map((provider, index) => (
+                <tr key={provider.providerId}>
+                  <td>
+                    <div className="provider-info">
+                      <span className="provider-rank">#{index + 1}</span>
+                      <span className="provider-name">
+                        {provider.providerName}
+                      </span>
+                    </div>
+                  </td>
+                  <td>{formatCurrency(provider.revenue)}</td>
+                  <td>{provider.bookings.toLocaleString()}</td>
+                  <td>{formatCurrency(provider.commission)}</td>
+                  <td>
+                    <div className="performance-bar">
+                      <div
+                        className="performance-fill"
+                        style={{
+                          width: `${(provider.revenue / earnings.totalRevenue) * 100}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default AdminEarningsPayments;

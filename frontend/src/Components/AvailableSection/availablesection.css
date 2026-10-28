@@ -1,0 +1,871 @@
+/* =====================================================================
+   DriveMeGo — Available B2C Routes (clean, scannable route cards)
+   ===================================================================== */
+* {
+  box-sizing: border-box;
+}
+
+.drivemego-availablesection-available-section {
+  font-family: var(--dmg-font, "Plus Jakarta Sans", sans-serif);
+}
+
+/* Title Section */
+.drivemego-availablesection-title-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.drivemego-availablesection-title-and-count {
+  flex: 1;
+  min-width: 280px;
+}
+
+.drivemego-availablesection-all-listings-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--dmg-teal-600, #0e97a8);
+  text-transform: uppercase;
+}
+
+.drivemego-availablesection-listings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--dmg-teal-050, #e6f7fa);
+}
+
+.drivemego-availablesection-listings-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.drivemego-availablesection-section-title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--dmg-navy, #0a2a43);
+  line-height: 1.15;
+}
+
+.drivemego-availablesection-routes-count {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--dmg-muted, #5b6b7b);
+  font-weight: 500;
+}
+
+/* Tab Buttons */
+.drivemego-availablesection-available-section-tab-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--dmg-line, #e4ecf3);
+  border-radius: 100px;
+  flex-wrap: wrap;
+}
+
+.drivemego-availablesection-available-section-tab-btn {
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--dmg-muted, #5b6b7b);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.drivemego-availablesection-available-section-tab-btn:hover {
+  color: var(--dmg-navy, #0a2a43);
+}
+
+.drivemego-availablesection-available-section-tab-btn.drivemego-availablesection-available-section-active {
+  background: var(--dmg-navy, #0a2a43);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(10, 42, 67, 0.2);
+}
+
+/* Filter Section */
+.drivemego-availablesection-filter-section {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.drivemego-availablesection-filter-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dmg-navy, #0a2a43);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.drivemego-availablesection-filter-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drivemego-availablesection-filter-tag {
+  padding: 8px 16px;
+  font-size: 13px;
+  border: 1.5px solid var(--dmg-line, #e4ecf3);
+  background: #fff;
+  color: var(--dmg-muted, #5b6b7b);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.drivemego-availablesection-filter-tag:hover {
+  border-color: var(--dmg-teal, #12b0c4);
+  color: var(--dmg-teal-600, #0e97a8);
+  background: var(--dmg-teal-050, #e6f7fa);
+}
+
+.drivemego-availablesection-filter-tag.drivemego-availablesection-available-section-active {
+  background: var(--dmg-navy, #0a2a43);
+  color: #fff;
+  border-color: var(--dmg-navy, #0a2a43);
+}
+
+/* Routes List */
+.drivemego-availablesection-routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+/* Route Item */
+@keyframes drivemego-availablesection-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.drivemego-availablesection-route-item,
+.drivemego-availablesection-available-section-route-item,
+.available-section-route-item {
+  position: relative;
+  background: var(--dmg-card, #fff);
+  border: 1px solid var(--dmg-line, #e4ecf3);
+  border-radius: 20px;
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(10, 42, 67, 0.04), 0 14px 34px rgba(10, 42, 67, 0.06);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+  animation: drivemego-availablesection-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Premium sheen — a soft teal highlight in the top-right corner that
+   deepens on hover, replacing the old flat colored left border. */
+.drivemego-availablesection-route-item::before,
+.drivemego-availablesection-available-section-route-item::before,
+.available-section-route-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 220px;
+  height: 100%;
+  background: radial-gradient(200px 140px at 100% 0%, rgba(18, 176, 196, 0.07), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
+}
+
+.drivemego-availablesection-route-item:hover::before,
+.drivemego-availablesection-available-section-route-item:hover::before,
+.available-section-route-item:hover::before {
+  opacity: 1;
+}
+
+.drivemego-availablesection-routes-list > .drivemego-availablesection-available-section-route-item:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.drivemego-availablesection-routes-list > .drivemego-availablesection-available-section-route-item:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.drivemego-availablesection-routes-list > .drivemego-availablesection-available-section-route-item:nth-child(n + 4) {
+  animation-delay: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drivemego-availablesection-route-item,
+  .drivemego-availablesection-available-section-route-item,
+  .available-section-route-item {
+    animation: none;
+  }
+}
+
+.drivemego-availablesection-route-item:hover,
+.drivemego-availablesection-available-section-route-item:hover,
+.available-section-route-item:hover {
+  transform: translateY(-3px);
+  border-color: rgba(18, 176, 196, 0.35);
+  box-shadow: var(--dmg-shadow-lg, 0 24px 60px rgba(10, 42, 67, 0.14));
+}
+
+/* Row 1: provider + seats + price */
+.drivemego-availablesection-route-row-1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 24px;
+}
+
+/* Row 2: details + button */
+.drivemego-availablesection-route-row-2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--dmg-line, #e4ecf3);
+}
+
+.drivemego-availablesection-available-section-route-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.drivemego-availablesection-route-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dmg-navy, #0a2a43);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.3;
+  flex-wrap: wrap;
+}
+
+.drivemego-availablesection-provider-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.drivemego-availablesection-provider-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #e5e7eb;
+  border: 1px solid var(--dmg-line, #e4ecf3);
+  flex-shrink: 0;
+}
+
+.drivemego-availablesection-availableseats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f7a44;
+  background: #eafaf1;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 6px 12px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.drivemego-availablesection-star-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #b26a00;
+  background: #fff7e6;
+  padding: 4px 9px;
+  border-radius: 8px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.drivemego-availablesection-star-icon svg {
+  width: 13px;
+  height: 13px;
+  color: var(--dmg-amber, #f6a723);
+}
+
+.drivemego-availablesection-company-badge {
+  background: #eef3f8;
+  color: var(--dmg-navy-600, #1c4d70);
+  padding: 4px 11px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+/* Route details */
+.drivemego-availablesection-my-route-details {
+  display: flex;
+  flex-direction: row;
+  gap: 40px;
+  align-items: flex-start;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.drivemego-availablesection-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.drivemego-availablesection-detail-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dmg-muted-2, #8598a8);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.drivemego-availablesection-availablesection-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dmg-muted, #5b6b7b);
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.drivemego-availablesection-detail-value {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dmg-ink, #0f2233);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.drivemego-availablesection-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+.drivemego-availablesection-detail-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.drivemego-availablesection-icon-from {
+  background: var(--dmg-teal-050, #e6f7fa);
+  color: var(--dmg-teal-600, #0e97a8);
+}
+
+.drivemego-availablesection-icon-to {
+  background: rgba(10, 42, 67, 0.06);
+  color: var(--dmg-navy, #0a2a43);
+}
+
+.drivemego-availablesection-icon-date {
+  background: #eef3f8;
+  color: var(--dmg-navy-600, #1c4d70);
+}
+
+/* Price section */
+.drivemego-availablesection-available-section-price-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+
+.drivemego-availablesection-price-label {
+  margin: 0;
+  font-size: 10px;
+  color: var(--dmg-muted-2, #8598a8);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.drivemego-availablesection-price-value {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--dmg-navy, #0a2a43);
+  line-height: 1.1;
+}
+
+/* Book button */
+.drivemego-availablesection-available-section-join-btn {
+  background: var(--dmg-cta, linear-gradient(135deg, #16bccf, #0e97a8));
+  color: #fff;
+  border: none;
+  padding: 12px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: fit-content;
+  box-shadow: 0 8px 18px rgba(18, 176, 196, 0.28);
+}
+
+.drivemego-availablesection-available-section-join-btn:hover:not(:disabled) {
+  background: var(--dmg-cta-hover, linear-gradient(135deg, #12b0c4, #0c8695));
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(18, 176, 196, 0.34);
+}
+
+.drivemego-availablesection-available-section-join-btn:disabled {
+  background: #cdd8e2;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.drivemego-availablesection-book-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.drivemego-availablesection-book-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Empty state */
+.drivemego-availablesection-empty-state {
+  text-align: center;
+  padding: 64px 24px;
+  color: var(--dmg-muted, #5b6b7b);
+  font-size: 15px;
+  background: #fff;
+  border: 1px dashed var(--dmg-line, #e4ecf3);
+  border-radius: 16px;
+}
+
+.drivemego-availablesection-empty-subtitle {
+  margin-top: 8px;
+  font-weight: 700;
+  color: var(--dmg-teal-600, #0e97a8);
+}
+
+/* Available days + trip times blocks */
+.drivemego-availablesection-availablesection-featured-detail-group {
+  padding-top: 6px;
+}
+
+.drivemego-availablesection-my-available-days {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.drivemego-availablesection-my-day-pill,
+.drivemego-availablesection-day-pill {
+  min-width: 36px;
+  height: 26px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #eef3f8;
+  color: var(--dmg-navy-600, #1c4d70);
+  font-size: 10px;
+  font-weight: 700;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.drivemego-availablesection-my-day-pill.drivemego-availablesection-weekend,
+.drivemego-availablesection-day-pill.drivemego-availablesection-weekend {
+  background: var(--dmg-coral-050, #fdeeee);
+  color: var(--dmg-coral, #12b0c4);
+}
+
+/* Trip Times Section */
+.drivemego-availablesection-trip-times-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--dmg-line, #e4ecf3);
+}
+
+.drivemego-availablesection-trip-times-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.drivemego-availablesection-trip-time-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 13px;
+  background: #eafaf1;
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f7a44;
+}
+
+.drivemego-availablesection-more-times {
+  font-size: 12px;
+  color: var(--dmg-muted, #5b6b7b);
+  font-weight: 700;
+  padding: 6px 12px;
+  background: #eef3f8;
+  border-radius: 8px;
+}
+
+.drivemego-availablesection-no-trip-times {
+  font-size: 12.5px;
+  color: var(--dmg-muted-2, #8598a8);
+  font-style: italic;
+  padding: 6px 12px;
+  background: #f5f9fc;
+  border-radius: 8px;
+}
+
+/* Route Stops Section */
+.availablesection-stops-group {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--dmg-line, #e4ecf3);
+}
+
+.availablesection-stops-group .availablesection-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dmg-muted, #5b6b7b);
+}
+
+.stops-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.stops-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--dmg-teal-600, #0e97a8);
+}
+
+.route-stops-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  position: relative;
+  padding: 4px 0;
+}
+
+.route-stop-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #f5f9fc;
+  border: 1px solid var(--dmg-line, #e4ecf3);
+  padding: 7px 13px;
+  border-radius: 100px;
+  font-size: 12px;
+  color: var(--dmg-navy-600, #1c4d70);
+  position: relative;
+  font-weight: 600;
+}
+
+.route-stop-item.start-point {
+  background: var(--dmg-teal-050, #e6f7fa);
+  border-color: rgba(18, 176, 196, 0.3);
+  color: var(--dmg-teal-600, #0e97a8);
+}
+
+.route-stop-item.end-point {
+  background: rgba(10, 42, 67, 0.06);
+  border-color: rgba(10, 42, 67, 0.22);
+  color: var(--dmg-navy, #0a2a43);
+}
+
+.stop-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dmg-muted-2, #8598a8);
+  flex-shrink: 0;
+}
+
+.stop-dot.start {
+  background: var(--dmg-teal, #12b0c4);
+}
+
+.stop-dot.end {
+  background: var(--dmg-navy, #0a2a43);
+}
+
+.stop-name {
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stop-time {
+  font-size: 10px;
+  color: var(--dmg-muted, #5b6b7b);
+  background: rgba(255, 255, 255, 0.85);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.route-stop-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  width: 8px;
+  height: 8px;
+  border-top: 1.5px solid #c7d6e2;
+  border-right: 1.5px solid #c7d6e2;
+  transform: rotate(45deg);
+}
+
+/* Route Tags */
+.drivemego-availablesection-route-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.drivemego-availablesection-route-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Tag Filter Section */
+.drivemego-availablesection-tag-filter-section {
+  margin-bottom: 22px;
+  padding: 16px;
+  background: #f5f9fc;
+  border-radius: 14px;
+  border: 1px solid var(--dmg-line, #e4ecf3);
+}
+
+.drivemego-availablesection-tag-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.drivemego-availablesection-clear-tags-btn {
+  padding: 5px 13px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dmg-coral, #12b0c4);
+  background: var(--dmg-coral-050, #e6f7fa);
+  border: 1px solid #bfe9ee;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drivemego-availablesection-clear-tags-btn:hover {
+  background: var(--dmg-coral, #12b0c4);
+  color: #fff;
+}
+
+.drivemego-availablesection-tag-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drivemego-availablesection-tag-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border-width: 1.5px;
+  border-style: solid;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+}
+
+.drivemego-availablesection-tag-filter-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(10, 42, 67, 0.12);
+}
+
+.drivemego-availablesection-tag-filter-btn.selected {
+  box-shadow: 0 4px 12px rgba(10, 42, 67, 0.16);
+}
+
+.drivemego-availablesection-clear-filters-btn {
+  margin-top: 12px;
+  padding: 9px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--dmg-teal-600, #0e97a8);
+  background: #fff;
+  border: 1.5px solid var(--dmg-teal, #12b0c4);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drivemego-availablesection-clear-filters-btn:hover {
+  background: var(--dmg-teal, #12b0c4);
+  color: #fff;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+  .drivemego-availablesection-title-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .drivemego-availablesection-available-section-tab-buttons {
+    width: 100%;
+  }
+
+  .drivemego-availablesection-available-section-tab-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .drivemego-availablesection-route-row-1 {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .drivemego-availablesection-available-section-price-section {
+    align-items: flex-start;
+  }
+
+  .drivemego-availablesection-route-row-2 {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .drivemego-availablesection-my-route-details {
+    gap: 20px;
+  }
+
+  .drivemego-availablesection-available-section-join-btn {
+    width: 100%;
+  }
+
+  .drivemego-availablesection-section-title {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .drivemego-availablesection-route-item,
+  .drivemego-availablesection-available-section-route-item,
+  .available-section-route-item {
+    padding: 16px;
+  }
+
+  .drivemego-availablesection-section-title {
+    font-size: 20px;
+  }
+
+  .drivemego-availablesection-my-route-details {
+    gap: 16px;
+    width: 100%;
+  }
+
+  .drivemego-availablesection-detail-group {
+    flex: 1 1 40%;
+  }
+
+  .drivemego-availablesection-price-value {
+    font-size: 22px;
+  }
+}

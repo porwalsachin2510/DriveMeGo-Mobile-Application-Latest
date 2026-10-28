@@ -1,0 +1,1187 @@
+import mongoose from "mongoose";
+import B2CPartnerRoute from "../models/B2CPartnerRoute.js";
+import B2CPartnerSchedule from "../models/B2CPartnerSchedule.js";
+import B2CPartnerTrip from "../models/B2CPartnerTrip.js";
+import B2CPartnerVehicle from "../models/B2CPartnerVehicle.js";
+import B2CPartnerDriver from "../models/B2CPartnerDriver.js";
+import B2CPassengerBooking from "../models/B2CPassengerBooking.js";
+import User from "../models/User.js";
+import RouteRequest from "../models/RouteRequest.js";
+import { createNotification, notifyDriverAssignedForRoute } from "../Services/notificationService.js";
+import { generateTripsForSchedule } from "../Services/tripGenerationService.js";
+import { computeRouteSeatAvailability } from "../Services/seatAvailabilityService.js";
+
+// Helper function to convert time string to minutes for comparison
+const timeToMinutes = (timeString) => {
+    if (!timeString) return 0;
+
+    // Handle HH:MM AM/PM format
+    const match = timeString.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (match) {
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3]?.toUpperCase();
+
+        if (period === 'PM' && hours !== 12) {
+            hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+            hours = 0;
+        }
+
+        return hours * 60 + minutes;
+    }
+
+    // Handle 24-hour format HH:MM
+    const match24 = timeString.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+        return parseInt(match24[1]) * 60 + parseInt(match24[2]);
+    }
+
+    return 0;
+};
+
+// Helper function to check if two time ranges overlap
+const doTimesOverlap = (time1, time2, bufferMinutes = 60) => {
+    const time1Minutes = timeToMinutes(time1);
+    const time2Minutes = timeToMinutes(time2);
+
+    // Two trips overlap if they are within bufferMinutes of each other
+    return Math.abs(time1Minutes - time2Minutes) < bufferMinutes;
+};
+
+// Helper function to check if days overlap
+const doDaysOverlap = (days1, days2) => {
+    if (!days1 || !days2 || days1.length === 0 || days2.length === 0) return false;
+    return days1.some(day => days2.includes(day));
+};
+
+// Helper function to check for driver scheduling conflicts
+const checkDriverConflict = async (driverId, b2cPartnerId, proposedSchedule, excludeRouteId = null) => {
+    if (!driverId) return { hasConflict: false };
+
+    console.log("[v0] Checking driver conflict for:", { driverId, b2cPartnerId });
+
+    // Get all existing schedules for this driver
+    const existingSchedules = await B2CPartnerSchedule.find({
+        b2cPartnerId: b2cPartnerId,
+        assignedDriver: driverId,
+        isActive: true,
+        status: "Active"
+    }).populate('routeId', 'fromLocation toLocation');
+
+    console.log("[v0] Found existing schedules for driver:", existingSchedules.length);
+
+    for (const existingSchedule of existingSchedules) {
+        // Skip if this is the same route we're updating
+        if (excludeRouteId && existingSchedule.routeId?._id?.toString() === excludeRouteId.toString()) {
+            continue;
+        }
+
+        // Check if days overlap
+        if (!doDaysOverlap(proposedSchedule.availableDays, existingSchedule.availableDays)) {
+            continue;
+        }
+
+        // Check if any trip times overlap
+        const proposedTime = proposedSchedule.startTime || proposedSchedule.scheduleTime;
+        for (const existingTrip of (existingSchedule.tripTimes || [])) {
+            if (doTimesOverlap(proposedTime, existingTrip.departureTime)) {
+                return {
+                    hasConflict: true,
+                    conflictType: "DRIVER_TIME_CONFLICT",
+                    existingRoute: existingSchedule.routeId ?
+                        `${existingSchedule.routeId.fromLocation} to ${existingSchedule.routeId.toLocation}` :
+                        "Unknown Route",
+                    conflictingTime: existingTrip.departureTime,
+                    proposedTime: proposedTime,
+                    overlappingDays: proposedSchedule.availableDays.filter(d => existingSchedule.availableDays.includes(d))
+                };
+            }
+        }
+
+        // Also check scheduleTime for legacy schedules
+        if (existingSchedule.scheduleTime && doTimesOverlap(proposedTime, existingSchedule.scheduleTime)) {
+            return {
+                hasConflict: true,
+                conflictType: "DRIVER_TIME_CONFLICT",
+                existingRoute: existingSchedule.routeId ?
+                    `${existingSchedule.routeId.fromLocation} to ${existingSchedule.routeId.toLocation}` :
+                    "Unknown Route",
+                conflictingTime: existingSchedule.scheduleTime,
+                proposedTime: proposedTime,
+                overlappingDays: proposedSchedule.availableDays.filter(d => existingSchedule.availableDays.includes(d))
+            };
+        }
+    }
+
+    return { hasConflict: false };
+};
+
+// Helper function to check for vehicle scheduling conflicts
+const checkVehicleConflict = async (vehicleId, b2cPartnerId, proposedSchedule, excludeRouteId = null) => {
+    if (!vehicleId) return { hasConflict: false };
+
+    console.log("[v0] Checking vehicle conflict for:", { vehicleId, b2cPartnerId });
+
+    // Get all existing schedules for this vehicle
+    const existingSchedules = await B2CPartnerSchedule.find({
+        b2cPartnerId: b2cPartnerId,
+        assignedVehicle: vehicleId,
+        isActive: true,
+        status: "Active"
+    }).populate('routeId', 'fromLocation toLocation');
+
+    for (const existingSchedule of existingSchedules) {
+        // Skip if this is the same route we're updating
+        if (excludeRouteId && existingSchedule.routeId?._id?.toString() === excludeRouteId.toString()) {
+            continue;
+        }
+
+        // Check if days overlap
+        if (!doDaysOverlap(proposedSchedule.availableDays, existingSchedule.availableDays)) {
+            continue;
+        }
+
+        // Check if any trip times overlap
+        const proposedTime = proposedSchedule.startTime || proposedSchedule.scheduleTime;
+        for (const existingTrip of (existingSchedule.tripTimes || [])) {
+            if (doTimesOverlap(proposedTime, existingTrip.departureTime)) {
+                return {
+                    hasConflict: true,
+                    conflictType: "VEHICLE_TIME_CONFLICT",
+                    existingRoute: existingSchedule.routeId ?
+                        `${existingSchedule.routeId.fromLocation} to ${existingSchedule.routeId.toLocation}` :
+                        "Unknown Route",
+                    conflictingTime: existingTrip.departureTime,
+                    proposedTime: proposedTime,
+                    overlappingDays: proposedSchedule.availableDays.filter(d => existingSchedule.availableDays.includes(d))
+                };
+            }
+        }
+
+        // Also check scheduleTime for legacy schedules
+        if (existingSchedule.scheduleTime && doTimesOverlap(proposedTime, existingSchedule.scheduleTime)) {
+            return {
+                hasConflict: true,
+                conflictType: "VEHICLE_TIME_CONFLICT",
+                existingRoute: existingSchedule.routeId ?
+                    `${existingSchedule.routeId.fromLocation} to ${existingSchedule.routeId.toLocation}` :
+                    "Unknown Route",
+                conflictingTime: existingSchedule.scheduleTime,
+                proposedTime: proposedTime,
+                overlappingDays: proposedSchedule.availableDays.filter(d => existingSchedule.availableDays.includes(d))
+            };
+        }
+    }
+
+    return { hasConflict: false };
+};
+
+// Helper function to convert time to HH:MM AM/PM format
+const convertToAMPMFormat = (timeString) => {
+    if (!timeString) return "";
+
+    // If already in correct format, return as is
+    if (/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]\s?(AM|PM)$/i.test(timeString)) {
+        return timeString.toUpperCase();
+    }
+
+    // Handle 24-hour format (HH:MM or HH:MM:SS)
+    if (/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/.test(timeString)) {
+        const [time] = timeString.split(':');
+        const [hours, minutes] = timeString.split(':').map(Number);
+
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12; // Convert 0 to 12
+
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
+
+    // Handle other formats, try to extract time
+    const timeMatch = timeString.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (timeMatch) {
+        let [, hours, minutes, period] = timeMatch;
+        hours = parseInt(hours);
+        minutes = parseInt(minutes);
+
+        if (!period) {
+            period = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+        }
+
+        return `${hours}:${minutes.toString().padStart(2, '0')} ${period.toUpperCase()}`;
+    }
+
+    // Default fallback
+    return "12:00 PM";
+};
+
+// Create Route
+export const createB2CPartnerRoute = async (req, res) => {
+    try {
+        console.log("[v0] Creating B2C Partner Route:", JSON.stringify(req.body, null, 2));
+
+        const {
+            routeName,
+            fromLocation,
+            toLocation,
+            stops,
+            totalSeats,
+            pricing,
+            tripType,
+            routeStartDate,
+            availableDays,
+            startTime, // Add startTime to destructuring
+            assignedVehicle, // Add assignedVehicle
+            assignedDriver  // Add assignedDriver
+        } = req.body;
+
+        // Validate required fields
+        if (!fromLocation || !toLocation || !totalSeats || !pricing) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields: fromLocation, toLocation, totalSeats, pricing"
+            });
+        }
+
+        // Check for driver and vehicle scheduling conflicts before creating route
+        if (assignedDriver && startTime && availableDays && availableDays.length > 0) {
+            const proposedSchedule = {
+                startTime: convertToAMPMFormat(startTime),
+                availableDays: availableDays
+            };
+
+            const driverConflict = await checkDriverConflict(
+                assignedDriver,
+                req.userId,
+                proposedSchedule
+            );
+
+            if (driverConflict.hasConflict) {
+                console.log("[v0] Driver conflict detected:", driverConflict);
+                return res.status(400).json({
+                    success: false,
+                    message: `Driver scheduling conflict detected! The selected driver is already assigned to route "${driverConflict.existingRoute}" at ${driverConflict.conflictingTime} on ${driverConflict.overlappingDays.join(", ")}. Please choose a different time or driver.`,
+                    conflictDetails: driverConflict
+                });
+            }
+        }
+
+        if (assignedVehicle && startTime && availableDays && availableDays.length > 0) {
+            const proposedSchedule = {
+                startTime: convertToAMPMFormat(startTime),
+                availableDays: availableDays
+            };
+
+            const vehicleConflict = await checkVehicleConflict(
+                assignedVehicle,
+                req.userId,
+                proposedSchedule
+            );
+
+            if (vehicleConflict.hasConflict) {
+                console.log("[v0] Vehicle conflict detected:", vehicleConflict);
+                return res.status(400).json({
+                    success: false,
+                    message: `Vehicle scheduling conflict detected! The selected vehicle is already assigned to route "${vehicleConflict.existingRoute}" at ${vehicleConflict.conflictingTime} on ${vehicleConflict.overlappingDays.join(", ")}. Please choose a different time or vehicle.`,
+                    conflictDetails: vehicleConflict
+                });
+            }
+        }
+
+        // Create stops array with order
+        const stopPoints = (stops || []).map((stop, index) => ({
+            location: stop.location,
+            time: stop.time || "",
+            order: index + 1
+        }));
+
+        const routeData = {
+            b2cPartnerId: req.userId,
+            fromLocation,
+            toLocation,
+            startTime, // Add startTime
+            stopPoints,
+            totalSeats: parseInt(totalSeats),
+            availableSeats: parseInt(totalSeats),
+            assignedVehicle, // Add assignedVehicle
+            assignedDriverId: assignedDriver, // Fix: Use assignedDriverId to match model
+            pricing: {
+                oneWayPrice: parseFloat(pricing.oneWayPrice || 0),
+                roundTripPrice: parseFloat(pricing.roundTripPrice || 0),
+                monthlyOneWayPrice: parseFloat(pricing.monthlyOneWayPrice || 0),
+                monthlyRoundTripPrice: parseFloat(pricing.monthlyRoundTripPrice || 0),
+            },
+            tripType: tripType || "One Way",
+            routeStartDate: new Date(routeStartDate),
+            availableDays: availableDays || ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+            status: "Active",
+            isActive: true
+        };
+
+        const route = await B2CPartnerRoute.create(routeData);
+
+        console.log("[v0] B2C Partner Route created successfully:", route._id);
+
+        // ---- Link this published route back to the open marketplace demand ----
+        // Find open RouteRequests on the same corridor and notify the commuters
+        // who created that demand, plus mark this partner's interest as fulfilled.
+        try {
+            const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const matchedRequests = await RouteRequest.find({
+                pickupLocation: { $regex: `^${escapeRegex(fromLocation)}$`, $options: "i" },
+                dropoffLocation: { $regex: `^${escapeRegex(toLocation)}$`, $options: "i" },
+                status: { $nin: ["REJECTED", "COMPLETED"] },
+            });
+
+            for (const request of matchedRequests) {
+                // Record the published route on the demand record.
+                if (!Array.isArray(request.fulfilledByRoutes)) request.fulfilledByRoutes = [];
+                request.fulfilledByRoutes.push({
+                    routeId: route._id,
+                    partnerId: req.userId,
+                    publishedAt: new Date(),
+                });
+
+                // Mark this partner's interest entry as published.
+                const mine = (request.interestedPartners || []).find(
+                    (p) => String(p.partnerId) === String(req.userId)
+                );
+                if (mine) mine.status = "ROUTE_PUBLISHED";
+
+                request.status = "FULFILLED";
+                await request.save();
+
+                // Notify the commuter their requested route is now bookable.
+                if (request.passengerId) {
+                    await createNotification({
+                        userId: request.passengerId,
+                        type: "ROUTE_REQUEST_RESPONSE",
+                        title: "Your Requested Route is Now Available!",
+                        message: `A route from ${request.pickupLocation} to ${request.dropoffLocation} is now live and ready to book.`,
+                        data: {
+                            requestId: request._id,
+                            routeId: route._id,
+                            pickupLocation: request.pickupLocation,
+                            dropoffLocation: request.dropoffLocation,
+                            status: "FULFILLED",
+                        },
+                    });
+                }
+            }
+
+            if (matchedRequests.length > 0) {
+                console.log(`[v0] Linked published route ${route._id} to ${matchedRequests.length} open demand request(s)`);
+            }
+        } catch (linkErr) {
+            // Linking is best-effort; never block route creation on it.
+            console.error("[v0] Failed to link route to open demand:", linkErr);
+        }
+
+        // Create schedule for the route if startTime and availableDays are provided
+        if (startTime && availableDays && availableDays.length > 0) {
+            console.log("[v0] Creating schedule for route:", route._id);
+
+            const scheduleData = {
+                b2cPartnerId: req.userId,
+                routeId: route._id,
+                scheduleTime: convertToAMPMFormat(startTime),
+                repeatPattern: "Custom",
+                availableDays: availableDays,
+                assignedVehicle: assignedVehicle || null,
+                assignedDriver: assignedDriver || null,
+                isActive: true,
+                status: "Active",
+                lastTripGenerated: new Date(),
+                nextTripGeneration: new Date()
+            };
+
+            const schedule = await B2CPartnerSchedule.create(scheduleData);
+            console.log("[v0] Schedule created successfully:", schedule._id);
+
+            // Assign vehicle to driver if both are provided
+            if (assignedVehicle && assignedDriver) {
+                console.log("[v0] Assigning vehicle to driver:", assignedVehicle, assignedDriver);
+                try {
+                    await B2CPartnerDriver.findByIdAndUpdate(
+                        assignedDriver,
+                        {
+                            $addToSet: { assignedVehicles: assignedVehicle },
+                            $set: { updatedAt: new Date() }
+                        }
+                    );
+                    console.log("[v0] Vehicle assigned to driver successfully");
+
+                    // Also assign driver to vehicle
+                    await B2CPartnerVehicle.findByIdAndUpdate(
+                        assignedVehicle,
+                        {
+                            $addToSet: { assignedDrivers: assignedDriver },
+                            $set: { updatedAt: new Date() }
+                        }
+                    );
+                    console.log("[v0] Driver assigned to vehicle successfully");
+                } catch (assignmentError) {
+                    console.error("[v0] Error assigning vehicle to driver:", assignmentError);
+                    // Don't fail route creation if assignment fails
+                }
+            }
+
+            // NOTE: DO NOT generate trips automatically when B2C_PARTNER creates route
+            // Trips should only be generated when COMMUTER makes booking
+            // This prevents creating empty trips that no one has booked
+            console.log("[v0] Route and schedule created - trips will be generated on passenger booking");
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Route created successfully",
+            route
+        });
+
+    } catch (error) {
+        console.error("[v0] Error creating B2C Partner Route:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error creating route",
+            error: error.message
+        });
+    }
+};
+
+// Get B2C partner routes
+export const getB2CPartnerRoutes = async (req, res) => {
+    try {
+        // Fetch real B2C partner routes from database
+        const routes = await B2CPartnerRoute.find({
+            b2cPartnerId: req.userId
+        })
+            .populate('assignedVehicle', 'model vehicleType seatingCapacity licensePlate year images')
+            .sort({ createdAt: -1 });
+
+        // Get B2C_PARTNER user info for self-driver case
+        const partnerUser = await User.findById(req.userId).select('fullName whatsappNumber profileImage');
+
+        // Add upcoming trips to each route and handle driver info
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const routesWithTrips = await Promise.all(
+            routes.map(async (route) => {
+                const upcomingTrips = await B2CPartnerTrip.find({
+                    routeId: route._id,
+                    tripDate: { $gte: today },
+                    status: "Scheduled"
+                }).sort({ tripDate: 1, startTime: 1 }).limit(10);
+
+                // Handle driver info - check if self-driver or assigned driver
+                let driverInfo = null;
+                let isSelfDriver = false;
+
+                if (route.assignedDriver) {
+                    // Try to find driver in B2CPartnerDriver table
+                    const assignedDriver = await B2CPartnerDriver.findById(route.assignedDriver)
+                        .select('name phoneNumber licenseNumber driverImage');
+
+                    if (assignedDriver) {
+                        driverInfo = {
+                            _id: assignedDriver._id,
+                            name: assignedDriver.name,
+                            phoneNumber: assignedDriver.phoneNumber,
+                            image: assignedDriver.driverImage?.url
+                        };
+                    } else if (route.assignedDriver.toString() === req.userId.toString()) {
+                        // Self-driver case - assignedDriver is the B2C_PARTNER's user ID
+                        driverInfo = {
+                            _id: partnerUser._id,
+                            name: partnerUser.fullName || "Self",
+                            phoneNumber: partnerUser.whatsappNumber,
+                            image: partnerUser.profileImage,
+                            isSelfDriver: true
+                        };
+                        isSelfDriver = true;
+                    }
+                }
+
+                // Get schedule info for start time
+                const schedule = await B2CPartnerSchedule.findOne({ routeId: route._id })
+                    .select('tripTimes availableDays');
+
+                const routeObj = route.toObject();
+
+                return {
+                    ...routeObj,
+                    upcomingTrips: upcomingTrips,
+                    driverInfo: driverInfo,
+                    isSelfDriver: isSelfDriver,
+                    assignedDriver: driverInfo, // Override for backward compatibility
+                    startTime: routeObj.startTime || schedule?.tripTimes?.[0]?.departureTime || "",
+                    availableDays: routeObj.availableDays?.length > 0
+                        ? routeObj.availableDays
+                        : schedule?.availableDays || []
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            routes: routesWithTrips || []
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C partner routes:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C routes"
+        });
+    }
+};
+
+// Update B2C partner route
+export const updateB2CPartnerRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const allowedFields = ['fromLocation', 'toLocation', 'startTime', 'totalSeats', 'availableSeats', 'pricing', 'tripType', 'routeStartDate', 'availableDays', 'assignedVehicle', 'assignedDriver', 'status', 'isActive', 'description', 'tags'];
+
+        const updateData = {};
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        }
+
+        // Handle pricing as nested object - preserve currency field
+        if (updateData.pricing) {
+            updateData.pricing = {
+                oneWayPrice: parseFloat(updateData.pricing.oneWayPrice || 0),
+                roundTripPrice: parseFloat(updateData.pricing.roundTripPrice || 0),
+                monthlyOneWayPrice: parseFloat(updateData.pricing.monthlyOneWayPrice || 0),
+                monthlyRoundTripPrice: parseFloat(updateData.pricing.monthlyRoundTripPrice || 0),
+                currency: updateData.pricing.currency || "AED",
+            };
+        }
+
+        if (updateData.totalSeats) {
+            updateData.totalSeats = parseInt(updateData.totalSeats);
+        }
+
+        // Handle assignedDriver -> assignedDriverId mapping
+        const newDriverId = updateData.assignedDriver || req.body.assignedDriverId;
+        if (updateData.assignedDriver) {
+            updateData.assignedDriverId = updateData.assignedDriver;
+            delete updateData.assignedDriver;
+        }
+
+        const route = await B2CPartnerRoute.findOneAndUpdate(
+            { _id: routeId, b2cPartnerId: req.userId },
+            { $set: updateData },
+            { new: true }
+        )
+            .populate('assignedVehicle', 'model vehicleType seatingCapacity licensePlate year')
+            .populate('assignedDriverId', 'name phoneNumber email profileImage');
+
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found or you don't have permission to update it"
+            });
+        }
+
+        // PROPAGATE DRIVER ASSIGNMENT to schedules, trips, and bookings if driver changed
+        if (newDriverId) {
+            console.log(`[v0] Propagating driver assignment to schedules, trips, and bookings for route ${routeId}`);
+
+            // Get driver details for booking updates
+            let driverName = null;
+            let driverImage = null;
+            let driverPhone = null;
+            let isSelfDriver = false;
+
+            // Check if driver is the partner (self-driver)
+            if (newDriverId.toString() === req.userId.toString()) {
+                isSelfDriver = true;
+                const partner = await User.findById(req.userId);
+                if (partner) {
+                    driverName = partner.fullName || partner.name || 'Self';
+                    driverImage = partner.profileImage;
+                    driverPhone = partner.whatsappNumber || partner.phone;
+                }
+            } else {
+                // Get driver details from B2CPartnerDriver
+                const driver = await B2CPartnerDriver.findById(newDriverId);
+                if (driver) {
+                    driverName = driver.name;
+                    driverImage = driver.driverImage?.url;
+                    driverPhone = driver.phoneNumber;
+                    isSelfDriver = false;
+                }
+            }
+
+            // Update all schedules for this route
+            const scheduleUpdateResult = await B2CPartnerSchedule.updateMany(
+                { routeId: routeId, isActive: true },
+                { $set: { assignedDriver: newDriverId } }
+            );
+            console.log(`[v0] Updated ${scheduleUpdateResult.modifiedCount} schedules with new driver`);
+
+            // Update all future trips for this route
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const tripUpdateResult = await B2CPartnerTrip.updateMany(
+                { routeId: routeId, tripDate: { $gte: today } },
+                {
+                    $set: {
+                        driverId: newDriverId,
+                        'driverInfo.name': driverName,
+                        'driverInfo.phoneNumber': driverPhone
+                    }
+                }
+            );
+            console.log(`[v0] Updated ${tripUpdateResult.modifiedCount} future trips with new driver`);
+
+            // Update all active/pending bookings for this route
+            if (driverName) {
+                const bookingUpdateResult = await B2CPassengerBooking.updateMany(
+                    {
+                        routeId: routeId,
+                        bookingStatus: { $in: ['PENDING', 'ACCEPTED', 'CONFIRMED', 'IN_PROGRESS'] }
+                    },
+                    {
+                        $set: {
+                            assignedDriverId: newDriverId,
+                            driverName: driverName,
+                            driverImage: driverImage,
+                            driverPhoneNumber: driverPhone,
+                            isSelfDriver: isSelfDriver
+                        }
+                    }
+                );
+                console.log(`[v0] Updated ${bookingUpdateResult.modifiedCount} active bookings with new driver`);
+            }
+
+            // Notify all confirmed passengers (and the driver) about the assignment
+            try {
+                const driverDocForNotify = isSelfDriver
+                    ? { name: driverName, phoneNumber: driverPhone }
+                    : await B2CPartnerDriver.findById(newDriverId);
+                // Self-drivers ARE a user account; external drivers have a linked userId if any
+                const driverUserId = isSelfDriver
+                    ? req.userId
+                    : (driverDocForNotify?.userId || null);
+                await notifyDriverAssignedForRoute(routeId, driverDocForNotify, driverUserId);
+            } catch (notifyErr) {
+                console.error("[v0] Failed to send driver-assigned notifications:", notifyErr.message);
+            }
+        }
+
+        console.log(`[v0] Successfully updated B2C route: ${route.fromLocation} to ${route.toLocation}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Route updated successfully",
+            route
+        });
+    } catch (error) {
+        console.error("[v0] Error updating B2C route:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error updating route",
+            error: error.message
+        });
+    }
+};
+
+// Delete B2C partner route
+export const deleteB2CPartnerRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+
+        // Find and delete route
+        const route = await B2CPartnerRoute.findOneAndDelete({
+            _id: routeId,
+            b2cPartnerId: req.userId
+        });
+
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found or you don't have permission to delete it"
+            });
+        }
+
+        console.log(`Successfully deleted B2C route: ${route.fromLocation} to ${route.toLocation}`);
+
+        res.status(200).json({
+            success: true,
+            message: "B2C route deleted successfully"
+        });
+    } catch (error) {
+        console.error("[v0] Error deleting B2C route:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting B2C route",
+            error: error.message
+        });
+    }
+};
+
+// Get Today's Trips
+export const getTodayTrips = async (req, res) => {
+    try {
+        const { routeId } = req.query; // Get routeId from query params
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+
+        // Get trips from today onwards (next 30 days)
+        const endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 30); // Next 30 days
+
+        // Build query filter
+        const queryFilter = {
+            b2cPartnerId: req.userId,
+            tripDate: {
+                $gte: today,
+                $lt: endDate
+            }
+        };
+
+        // Add routeId filter if provided
+        if (routeId) {
+            queryFilter.routeId = routeId;
+        }
+
+        // Fetch upcoming trips for this B2C partner (and specific route if provided)
+        const trips = await B2CPartnerTrip.find(queryFilter)
+            .populate('vehicleId', 'model licensePlate vehicleType')
+            .populate('driverId', 'name phoneNumber')
+            .populate('routeId', 'fromLocation toLocation startTime')
+            .sort({ tripDate: 1, startTime: 1 });
+
+        res.status(200).json({
+            success: true,
+            trips: trips || []
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching today's trips:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching today's trips",
+            error: error.message
+        });
+    }
+};
+
+// Create Schedule for Route
+export const createB2CPartnerSchedule = async (req, res) => {
+    try {
+        const { routeId, scheduleData } = req.body;
+
+        const schedule = new B2CPartnerSchedule({
+            routeId,
+            b2cPartnerId: req.userId,
+            ...scheduleData
+        });
+
+        await schedule.save();
+
+        // Generate trips for this schedule
+        // await generateTripsForSchedule(schedule._id);
+
+        res.status(201).json({
+            success: true,
+            message: "Schedule created successfully",
+            schedule
+        });
+    } catch (error) {
+        console.error("[v0] Error creating B2C Partner Schedule:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error creating schedule",
+            error: error.message
+        });
+    }
+};
+
+// Get Schedules for Route
+export const getB2CPartnerSchedules = async (req, res) => {
+    try {
+        const { routeId } = req.query;
+
+        const query = {
+            b2cPartnerId: req.userId,
+            isActive: true,
+            status: "Active"
+        };
+
+        if (routeId) {
+            query.routeId = routeId;
+        }
+
+        const schedules = await B2CPartnerSchedule.find(query)
+            .populate('routeId', 'fromLocation toLocation tripType')
+            .populate('assignedVehicle', 'model licensePlate vehicleType')
+            .populate('assignedDriver', 'name phoneNumber')
+            .sort({ scheduleTime: 1 });
+
+        res.status(200).json({
+            success: true,
+            schedules
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching schedules:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching schedules",
+            error: error.message
+        });
+    }
+};
+
+// Create Trip from Schedule
+// Public route trip seat availability (for commuters)
+export const getPublicRouteTripSeatAvailability = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+
+        console.log("[v0] Getting PUBLIC seat availability for route:", routeId);
+
+        const route = await B2CPartnerRoute.findById(routeId);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        // Seat availability is computed authoritatively from ACTIVE monthly
+        // passes per trip-leg (a pass holds a seat for the whole month), NOT
+        // from a single day's generated trip row. This guarantees the number
+        // drops as soon as a commuter books.
+        const { seatAvailability } = await computeRouteSeatAvailability(route);
+
+        console.log("[v0] PUBLIC seat availability keys:", Object.keys(seatAvailability));
+
+        res.status(200).json({
+            success: true,
+            message: "Seat availability retrieved successfully (PUBLIC)",
+            routeId: routeId,
+            routeName: `${route.fromLocation} → ${route.toLocation}`,
+            totalTrips: Object.keys(seatAvailability).length,
+            seatAvailability: seatAvailability
+        });
+
+    } catch (error) {
+        console.error("[v0] Error getting PUBLIC seat availability:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error retrieving seat availability",
+            error: error.message
+        });
+    }
+};
+
+// Get route trip seat availability for real-time display
+export const getRouteTripSeatAvailability = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const b2cPartnerId = req.userId;
+
+        console.log("[v0] Getting seat availability for route:", routeId);
+        console.log("[v0] Requested by user:", b2cPartnerId);
+
+        // Get route details
+        const route = await B2CPartnerRoute.findById(routeId);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        console.log("[v0] Route found:", {
+            routeId: route._id,
+            fromLocation: route.fromLocation,
+            toLocation: route.toLocation,
+            b2cPartnerId: route.b2cPartnerId
+        });
+
+        // Check authorization
+        if (route.b2cPartnerId.toString() !== b2cPartnerId) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized to access this route"
+            });
+        }
+
+        // Compute availability per trip-leg from ACTIVE monthly passes (shared
+        // with the public endpoint) so partner and commuter always see the
+        // same, up-to-date seat counts.
+        const { seatAvailability } = await computeRouteSeatAvailability(route);
+
+        console.log("[v0] Seat availability keys:", Object.keys(seatAvailability));
+
+        res.status(200).json({
+            success: true,
+            message: "Seat availability retrieved successfully",
+            routeId: routeId,
+            routeName: `${route.fromLocation} → ${route.toLocation}`,
+            totalTrips: Object.keys(seatAvailability).length,
+            seatAvailability: seatAvailability
+        });
+
+    } catch (error) {
+        console.error("[v0] Error getting seat availability:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error retrieving seat availability",
+            error: error.message
+        });
+    }
+};
+
+// Create Trip from Schedule
+export const createB2CPartnerTrip = async (req, res) => {
+    try {
+        const tripData = req.body;
+
+        const trip = new B2CPartnerTrip({
+            ...tripData,
+            b2cPartnerId: req.userId
+        });
+
+        await trip.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Trip created successfully",
+            trip
+        });
+    } catch (error) {
+        console.error("[v0] Error creating B2C Partner Trip:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error creating trip",
+            error: error.message
+        });
+    }
+};
+
+// Get Trips for Route
+export const getB2CPartnerTrips = async (req, res) => {
+    try {
+        const { routeId } = req.query;
+        const { startDate } = req.query;
+
+        const query = {
+            b2cPartnerId: req.userId
+        };
+
+        if (routeId) {
+            query.routeId = routeId;
+        }
+
+        if (startDate) {
+            query.tripDate = {
+                $gte: new Date(startDate)
+            };
+        }
+
+        const trips = await B2CPartnerTrip.find(query)
+            .populate('routeId', 'fromLocation toLocation tripType')
+            .populate('vehicleId', 'model licensePlate vehicleType')
+            .populate('driverId', 'fullName phoneNumber')
+            .sort({ tripDate: 1 });
+
+        res.status(200).json({
+            success: true,
+            trips
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching trips:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching trips",
+            error: error.message
+        });
+    }
+};
+
+// Get ALL schedules for a specific route (PUBLIC endpoint for commuter booking)
+export const getSchedulesForRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+
+        if (!routeId) {
+            return res.status(400).json({
+                success: false,
+                message: "Route ID is required"
+            });
+        }
+
+        // Get the route to verify it exists
+        const route = await B2CPartnerRoute.findById(routeId);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        // Get ALL active schedules for this route
+        const schedules = await B2CPartnerSchedule.find({
+            routeId: routeId,
+            isActive: true,
+            status: "Active"
+        })
+            .populate('assignedVehicle', 'model licensePlate vehicleType seatingCapacity vehicleColor images')
+            .populate('assignedDriver', 'name phoneNumber driverImage')
+            .sort({ createdAt: 1 });
+
+        // Collect all unique driver and vehicle IDs from tripTimes for batch lookup
+        const driverIds = new Set();
+        const vehicleIds = new Set();
+
+        schedules.forEach(sch => {
+            if (sch.tripTimes && sch.tripTimes.length > 0) {
+                sch.tripTimes.forEach(tt => {
+                    if (tt.assignedDriver) driverIds.add(tt.assignedDriver.toString());
+                    if (tt.assignedVehicle) vehicleIds.add(tt.assignedVehicle.toString());
+                });
+            }
+        });
+
+        // Convert string IDs back to ObjectIds for proper MongoDB querying
+        const driverObjectIds = Array.from(driverIds).map(id => {
+            try {
+                return new mongoose.Types.ObjectId(id);
+            } catch (e) {
+                return null;
+            }
+        }).filter(Boolean);
+
+        const vehicleObjectIds = Array.from(vehicleIds).map(id => {
+            try {
+                return new mongoose.Types.ObjectId(id);
+            } catch (e) {
+                return null;
+            }
+        }).filter(Boolean);
+
+        // Batch fetch all drivers (from B2CPartnerDriver collection)
+        const drivers = await B2CPartnerDriver.find({
+            _id: { $in: driverObjectIds }
+        }).select('name phoneNumber driverImage email');
+
+        // Also fetch from User collection (for self-driving B2C Partners)
+        const userDrivers = await User.find({
+            _id: { $in: driverObjectIds }
+        }).select('fullName whatsappNumber profileImage email');
+
+        // Create driver lookup map
+        const driverMap = {};
+        drivers.forEach(d => {
+            driverMap[d._id.toString()] = {
+                _id: d._id,
+                name: d.name,
+                phoneNumber: d.phoneNumber,
+                image: d.driverImage?.url || null,
+                email: d.email
+            };
+        });
+        // Add user drivers (B2C Partners who drive themselves)
+        userDrivers.forEach(u => {
+            if (!driverMap[u._id.toString()]) {
+                driverMap[u._id.toString()] = {
+                    _id: u._id,
+                    name: u.fullName,
+                    phoneNumber: u.whatsappNumber,
+                    image: u.profileImage || null,
+                    email: u.email
+                };
+            }
+        });
+
+        // Batch fetch all vehicles
+        const vehicles = await B2CPartnerVehicle.find({
+            _id: { $in: vehicleObjectIds }
+        }).select('model licensePlate vehicleType seatingCapacity vehicleColor images');
+
+        // Create vehicle lookup map
+        const vehicleMap = {};
+        vehicles.forEach(v => {
+            vehicleMap[v._id.toString()] = {
+                _id: v._id,
+                model: v.model,
+                licensePlate: v.licensePlate,
+                vehicleType: v.vehicleType,
+                seatingCapacity: v.seatingCapacity,
+                vehicleColor: v.vehicleColor,
+                image: v.images?.[0]?.url || null
+            };
+        });
+
+        // Combine all trip times from all schedules with populated driver/vehicle data
+        const allTripTimes = [];
+        schedules.forEach(sch => {
+            if (sch.tripTimes && sch.tripTimes.length > 0) {
+                sch.tripTimes.forEach(tt => {
+                    // Convert mongoose document to plain object
+                    const tripTimeObj = tt.toObject ? tt.toObject() : (tt._doc ? { ...tt._doc } : { ...tt });
+
+                    // Get the effective driver - trip-level first, then schedule-level fallback
+                    const tripDriverId = tt.assignedDriver?.toString();
+                    const effectiveDriver = tripDriverId && driverMap[tripDriverId]
+                        ? driverMap[tripDriverId]
+                        : (sch.assignedDriver ? {
+                            _id: sch.assignedDriver._id,
+                            name: sch.assignedDriver.name,
+                            phoneNumber: sch.assignedDriver.phoneNumber,
+                            image: sch.assignedDriver.driverImage?.url || null
+                        } : null);
+
+                    // Get the effective vehicle - trip-level first, then schedule-level fallback
+                    const tripVehicleId = tt.assignedVehicle?.toString();
+                    const effectiveVehicle = tripVehicleId && vehicleMap[tripVehicleId]
+                        ? vehicleMap[tripVehicleId]
+                        : (sch.assignedVehicle ? {
+                            _id: sch.assignedVehicle._id,
+                            model: sch.assignedVehicle.model,
+                            licensePlate: sch.assignedVehicle.licensePlate,
+                            vehicleType: sch.assignedVehicle.vehicleType,
+                            seatingCapacity: sch.assignedVehicle.seatingCapacity,
+                            vehicleColor: sch.assignedVehicle.vehicleColor,
+                            image: sch.assignedVehicle.images?.[0]?.url || null
+                        } : null);
+
+                    allTripTimes.push({
+                        ...tripTimeObj,
+                        scheduleId: sch._id,
+                        scheduleName: sch.scheduleName,
+                        availableDays: sch.availableDays,
+                        scheduleVehicle: sch.assignedVehicle,
+                        scheduleDriver: sch.assignedDriver,
+                        // Add populated driver/vehicle data for this specific trip time
+                        effectiveDriver: effectiveDriver,
+                        effectiveVehicle: effectiveVehicle
+                    });
+                });
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            schedules: schedules,
+            allTripTimes: allTripTimes,
+            totalSchedules: schedules.length,
+            routeId: routeId
+        });
+    } catch (error) {
+        console.error("Error fetching schedules for route:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching schedules",
+            error: error.message
+        });
+    }
+};

@@ -1,0 +1,25 @@
+/* Admin Dashboard - Content Styles */
+/* Note: Layout, header, and sidebar are handled by DashboardLayout component */
+
+.admin-dashboard-content {
+  width: 100%;
+  min-height: calc(100vh - 200px);
+}
+
+/* Ensure admin components fill the available space */
+.admin-dashboard-content > div {
+  width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .admin-dashboard-content {
+    padding: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard-content {
+    padding: 0;
+  }
+}

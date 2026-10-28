@@ -1,0 +1,1240 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+.drivemego-corporate-contract-details-container {
+  padding: 32px 20px 64px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f2233;
+}
+
+.drivemego-corporate-contract-back-btn {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.drivemego-corporate-contract-back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(18, 176, 196, 0.4);
+}
+
+.drivemego-corporate-contract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.drivemego-corporate-contract-header h1 {
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 800;
+  color: #0a2a43;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.drivemego-corporate-contract-status {
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* ===== Contract section tabs ===== */
+.drivemego-corporate-contract-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 8px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.drivemego-corporate-contract-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: #555;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.drivemego-corporate-contract-tab:hover {
+  background: #e6f7fa;
+  color: #0e97a8;
+}
+
+.drivemego-corporate-contract-tab.active {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(18, 176, 196, 0.35);
+}
+
+.drivemego-corporate-contract-tab-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .drivemego-corporate-contract-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .drivemego-corporate-contract-tab {
+    flex: 0 0 auto;
+  }
+}
+
+.drivemego-corporate-contract-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.drivemego-corporate-contract-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.drivemego-corporate-contract-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 20px 0;
+}
+
+.drivemego-corporate-contract-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.drivemego-corporate-contract-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivemego-corporate-contract-info-item .drivemego-label {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.drivemego-corporate-contract-info-item .drivemego-value {
+  font-size: 16px;
+  color: #333;
+  font-weight: 500;
+}
+
+.drivemego-corporate-contract-vehicles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.drivemego-corporate-contract-vehicle-card {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  padding: 20px;
+  border-radius: 12px;
+  color: white;
+}
+
+.drivemego-corporate-contract-vehicle-card .drivemego-corporate-contract-vehicle-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.drivemego-corporate-contract-vehicle-card .drivemego-corporate-contract-vehicle-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.drivemego-corporate-contract-document {
+  text-align: center;
+  padding: 20px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.drivemego-corporate-contract-document a {
+  font-size: 18px;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.drivemego-corporate-contract-document a:hover {
+  text-decoration: underline;
+}
+
+.drivemego-corporate-contract-document .drivemego-uploaded-info {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #666;
+}
+
+.drivemego-corporate-contract-financials {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drivemego-corporate-contract-financials .drivemego-financial-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.drivemego-corporate-contract-financials .drivemego-financial-item .drivemego-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 600;
+}
+
+.drivemego-corporate-contract-financials .drivemego-financial-item .drivemego-value {
+  font-size: 18px;
+  color: #333;
+  font-weight: 700;
+}
+
+.drivemego-corporate-contract-signatures {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drivemego-corporate-contract-signatures .drivemego-signature-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.drivemego-corporate-contract-signatures .drivemego-signature-status .drivemego-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 600;
+}
+
+.drivemego-corporate-contract-signatures .drivemego-signature-status .drivemego-status {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.drivemego-corporate-contract-signatures .drivemego-signature-status .drivemego-status.drivemego-signed {
+  background: #4caf50;
+  color: white;
+}
+
+.drivemego-corporate-contract-signatures .drivemego-signature-status .drivemego-status.drivemego-pending {
+  background: #ffa500;
+  color: white;
+}
+
+.drivemego-corporate-contract-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.drivemego-corporate-contract-btn-primary,
+.drivemego-corporate-contract-btn-success,
+.drivemego-corporate-contract-btn-secondary {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drivemego-corporate-contract-btn-primary {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+}
+
+.drivemego-corporate-contract-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(18, 176, 196, 0.4);
+}
+
+.drivemego-corporate-contract-btn-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+}
+
+.drivemego-corporate-contract-btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(17, 153, 142, 0.4);
+}
+
+.drivemego-corporate-contract-btn-primary:disabled,
+.drivemego-corporate-contract-btn-success:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.drivemego-corporate-contract-btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.drivemego-corporate-contract-btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+.drivemego-corporate-contract-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.drivemego-corporate-contract-modal {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.drivemego-corporate-contract-modal h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.drivemego-corporate-contract-modal p {
+  margin: 0 0 20px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.drivemego-corporate-contract-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  margin-bottom: 20px;
+  transition: border-color 0.3s ease;
+}
+
+.drivemego-corporate-contract-input:focus {
+  outline: none;
+  border-color: #12b0c4;
+}
+
+.drivemego-corporate-contract-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.drivemego-corporate-contract-details-loading,
+.drivemego-corporate-contract-details-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+}
+
+.drivemego-corporate-contract-details-error .drivemego-error-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.drivemego-corporate-contract-details-error h3 {
+  font-size: 24px;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.drivemego-corporate-contract-details-error p {
+  color: #666;
+  margin: 0 0 24px 0;
+}
+
+.drivemego-corporate-contract-details-error button {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.drivemego-corporate-contract-details-error button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(18, 176, 196, 0.4);
+}
+
+.drivemego-payment-methods-section {
+  background: linear-gradient(135deg, #12b0c415 0%, #0e97a815 100%);
+  border: 2px solid #12b0c4;
+}
+
+.drivemego-payment-methods-subtitle {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.drivemego-accepted-payment-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.drivemego-payment-method-badge {
+  display: inline-flex;              /* IMPORTANT */
+  align-items: center;               /* vertical center */
+  justify-content: center;
+  gap: 6px;
+
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #797979;
+  background: #fff;
+
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;                    /* 🔥 MAIN FIX */
+  white-space: nowrap;
+}
+
+
+.drivemego-payment-method-badge:hover {
+  border-color: #12b0c4;
+  box-shadow: 0 4px 12px rgba(18, 176, 196, 0.2);
+}
+
+.drivemego-method-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 16px;                   /* reduce size */
+  line-height: 1;                    /* 🔥 icon extra height remove */
+}
+
+.drivemego-method-name {
+  display: inline-flex;
+  align-items: center;
+
+  font-size: 13px;
+  line-height: 1;                    /* 🔥 text height match */
+}
+
+
+.drivemego-payment-status.drivemego-status-completed {
+  background: #4caf50;
+  color: white;
+}
+
+.drivemego-payment-status.drivemego-status-pending {
+  background: #ffa500;
+  color: white;
+}
+
+.drivemego-payment-status.drivemego-status-failed {
+  background: #f44336;
+  color: white;
+}
+
+/* Adding waiting section styles for contract document pending state */
+.drivemego-corporate-contract-waiting-section {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  border-radius: 16px;
+  padding: 48px 32px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 10px 40px rgba(18, 176, 196, 0.3);
+  margin: 20px 0;
+}
+
+.drivemego-waiting-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.drivemego-corporate-contract-waiting-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: white;
+}
+
+.drivemego-corporate-contract-waiting-section p {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  opacity: 0.95;
+}
+
+.drivemego-waiting-details {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 32px auto;
+  max-width: 600px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.drivemego-waiting-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.drivemego-waiting-info-item:last-child {
+  border-bottom: none;
+}
+
+.drivemego-waiting-info-item .drivemego-label {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.drivemego-waiting-info-item .drivemego-value {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.drivemego-waiting-actions {
+  margin-top: 32px;
+}
+
+.drivemego-waiting-actions .drivemego-btn-secondary {
+  background: white;
+  color: #12b0c4;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drivemego-waiting-actions .drivemego-btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
+}
+
+/* Add styles for the new info button */
+.drivemego-corporate-contract-btn-info {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drivemego-corporate-contract-btn-info:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+}
+
+.drivemego-corporate-contract-btn-info:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 768px) {
+  .drivemego-corporate-contract-details-container {
+    padding: 12px;
+  }
+
+  .drivemego-corporate-contract-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .drivemego-corporate-contract-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-corporate-contract-vehicles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-corporate-contract-actions {
+    flex-direction: column;
+  }
+
+  .drivemego-corporate-contract-modal {
+    width: 95%;
+    padding: 20px;
+  }
+
+  .drivemego-accepted-payment-methods {
+  grid-template-columns: 1fr;
+}
+
+.drivemego-corporate-contract-payment-info {
+  grid-template-columns: 1fr;
+}
+
+.drivemego-corporate-contract-waiting-section {
+    padding: 32px 20px;
+  }
+
+  .drivemego-waiting-icon {
+    font-size: 48px;
+  }
+
+  .drivemego-corporate-contract-waiting-section h2 {
+    font-size: 22px;
+  }
+
+  .drivemego-waiting-details {
+    padding: 16px;
+  }
+}
+
+/* Negotiation Commission Section */
+.drivemego-corporate-negotiation-commission-section {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 10%, #ffffff 10%);
+  border: 1px solid #fbbf24;
+}
+
+.drivemego-negotiation-commission-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drivemego-commission-description {
+  font-size: 14px;
+  color: #92400e;
+  background: #fffbeb;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid #f59e0b;
+  margin: 0;
+}
+
+.drivemego-financial-item.drivemego-highlight-savings {
+  background: #dcfce7;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.drivemego-financial-item.drivemego-highlight-savings .drivemego-value {
+  color: #166534;
+  font-weight: 700;
+}
+
+.drivemego-savings-value {
+  color: #10b981 !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+}
+
+.drivemego-financial-item.drivemego-commission-item {
+  background: #e6f7fa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.drivemego-financial-item.drivemego-commission-item .drivemego-value {
+  color: #0a2a43;
+  font-weight: 700;
+}
+
+.drivemego-financial-item.drivemego-commission-total {
+  background: #1b5e20;
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.drivemego-financial-item.drivemego-commission-total .drivemego-label,
+.drivemego-financial-item.drivemego-commission-total .drivemego-value {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.drivemego-commission-status {
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.drivemego-commission-status.drivemego-paid {
+  color: #10b981;
+}
+
+.drivemego-commission-status.drivemego-pending {
+  color: #f59e0b;
+}
+
+.drivemego-commission-note {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  margin: 8px 0 0 0;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+
+/* Document Card Styles */
+.drivemego-document-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.drivemego-document-card:hover {
+  border-color: #12b0c4;
+  box-shadow: 0 4px 12px rgba(18, 176, 196, 0.1);
+}
+
+.drivemego-document-card.drivemego-signed-doc {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.drivemego-document-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.drivemego-document-icon {
+  font-size: 40px;
+}
+
+.drivemego-document-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivemego-document-details strong {
+  font-size: 16px;
+  color: #1f2937;
+}
+
+.drivemego-document-details .drivemego-uploaded-info {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.drivemego-document-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.drivemego-btn-view-doc,
+.drivemego-btn-download-doc {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.drivemego-btn-view-doc {
+  background: #12b0c4;
+  color: #fff;
+  border: none;
+}
+
+.drivemego-btn-view-doc:hover {
+  background: #0e97a8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(18, 176, 196, 0.3);
+}
+
+.drivemego-btn-download-doc {
+  background: white;
+  color: #12b0c4;
+  border: 2px solid #12b0c4;
+}
+
+.drivemego-btn-download-doc:hover {
+  background: #12b0c4;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* Verification Badge */
+.drivemego-verification-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.drivemego-verification-badge.drivemego-verified {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.drivemego-verification-badge.drivemego-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.drivemego-verification-badge.drivemego-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Upload Signed Document Section */
+.drivemego-upload-signed-section {
+  background: linear-gradient(135deg, #f6f9fc 0%, #cbeef4 100%);
+  border: 2px dashed #0284c7;
+}
+
+.drivemego-upload-signed-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.drivemego-upload-signed-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drivemego-instruction-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.drivemego-step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.drivemego-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivemego-step-content strong {
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.drivemego-step-content p {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.drivemego-btn-upload-signed {
+  align-self: center;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drivemego-btn-upload-signed:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(18, 176, 196, 0.4);
+}
+
+/* Waiting Verification Section */
+.drivemego-waiting-verification-section {
+  background: white;
+}
+
+.drivemego-waiting-verification-card {
+  text-align: center;
+  padding: 32px;
+}
+
+.drivemego-waiting-icon-large {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.drivemego-waiting-verification-card h3 {
+  font-size: 22px;
+  color: #1f2937;
+  margin: 0 0 12px 0;
+}
+
+.drivemego-waiting-verification-card p {
+  font-size: 15px;
+  color: #6b7280;
+  max-width: 500px;
+  margin: 0 auto 32px;
+  line-height: 1.6;
+}
+
+/* Verification Timeline */
+.drivemego-verification-timeline {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.drivemego-timeline-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  position: relative;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.drivemego-timeline-item::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.drivemego-timeline-item:last-child::after {
+  display: none;
+}
+
+.drivemego-timeline-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #9ca3af;
+  font-weight: 700;
+  font-size: 14px;
+  z-index: 1;
+}
+
+.drivemego-timeline-item.drivemego-done .drivemego-timeline-icon {
+  background: #10b981;
+  color: white;
+}
+
+.drivemego-timeline-item.drivemego-done::after {
+  background: #10b981;
+}
+
+.drivemego-timeline-item.drivemego-done {
+  color: #10b981;
+}
+
+.drivemego-timeline-item.drivemego-active .drivemego-timeline-icon {
+  background: #f59e0b;
+  color: white;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.drivemego-timeline-item.drivemego-active {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.drivemego-timeline-item.drivemego-pending .drivemego-timeline-icon {
+  background: #e5e7eb;
+  color: #9ca3af;
+}
+
+/* Upload Modal */
+.drivemego-upload-signed-modal {
+  max-width: 550px;
+}
+
+.drivemego-modal-description {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.drivemego-upload-area {
+  margin: 24px 0;
+}
+
+.drivemego-upload-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f9fafb;
+}
+
+.drivemego-upload-drop-zone:hover {
+  border-color: #12b0c4;
+  background: #e6f7fa;
+}
+
+.drivemego-upload-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.drivemego-upload-drop-zone p {
+  font-size: 16px;
+  color: #374151;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+}
+
+.drivemego-upload-hint {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.drivemego-selected-file-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: #f0fdf4;
+  border: 2px solid #10b981;
+  border-radius: 12px;
+}
+
+.drivemego-file-icon {
+  font-size: 40px;
+}
+
+.drivemego-file-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.drivemego-file-details strong {
+  font-size: 15px;
+  color: #1f2937;
+  word-break: break-all;
+}
+
+.drivemego-file-size {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.drivemego-btn-change-file {
+  padding: 8px 16px;
+  background: white;
+  border: 2px solid #10b981;
+  border-radius: 8px;
+  color: #10b981;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drivemego-btn-change-file:hover {
+  background: #10b981;
+  color: white;
+}
+
+.drivemego-upload-notice {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.drivemego-upload-notice strong {
+  display: block;
+  color: #92400e;
+  margin-bottom: 8px;
+}
+
+.drivemego-upload-notice ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #92400e;
+}
+
+.drivemego-upload-notice li {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .drivemego-document-card {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .drivemego-document-info {
+    flex-direction: column;
+  }
+
+  .drivemego-document-actions {
+    width: 100%;
+  }
+
+  .drivemego-document-actions a,
+  .drivemego-document-actions button {
+    flex: 1;
+  }
+
+  .drivemego-verification-timeline {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .drivemego-timeline-item::after {
+    display: none;
+  }
+
+  .drivemego-timeline-item {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .drivemego-instruction-step {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .drivemego-selected-file-info {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+/* Payment Options Section */
+.payment-options-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.payment-options-section h2 {
+  display: none; /* Title is inside the component */
+}

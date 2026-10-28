@@ -1,0 +1,1455 @@
+/* eslint-disable no-unused-vars */
+"use client";
+
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  loginSuccess,
+  authStart,
+  authError,
+  clearError,
+} from "../../Redux/slices/authSlice";
+import api from "../../utils/api";
+import { showSuccess, showError } from "../../utils/toast";
+import Navbar from "../../Components/Navbar/Navbar";
+import Footer from "../../Components/Footer/Footer";
+import OTPVerification from "../../Components/OTPVerification/OTPVerification";
+import TermsAndConditionsModal from "../../Components/TermsAndConditions/TermsAndConditionsModal";
+import {
+  selectLoading,
+  selectError,
+} from "../../Redux/selectors/authSelectors";
+import {
+  COUNTRY_CONFIG,
+  DEFAULT_COUNTRY,
+  normalizeCountry,
+  getCountryConfig,
+} from "../../config/localeConfig";
+import "./register.css";
+
+// Markets the platform is currently launched in. A visitor can only register
+// with the dial code of the country they are physically in, so a UAE visitor
+// can't register a Kuwait number and vice-versa.
+const SERVED_REGISTRATION_MARKETS = Object.values(COUNTRY_CONFIG)
+  .filter((c) => c.serviceAvailable)
+  .map((c) => c.code);
+
+const Register = () => {
+  const [selectedRole, setSelectedRole] = useState("COMMUTER");
+
+  const [success, setSuccess] = useState("");
+
+  const [isOpen, setIsOpen] = useState(true);
+
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Terms and Conditions state
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsVersion, setTermsVersion] = useState("1.0.0");
+  const [commissionRange, setCommissionRange] = useState({ min: 0, max: 35 });
+
+  const loading = useSelector(selectLoading);
+  const error = useSelector(selectError);
+
+  const navigate = useNavigate();
+
+  const dispatch = useDispatch();
+
+  // Auto-detected country from the global locale (GPS/IP based, resolved by
+  // initLocale on app load). We lock the WhatsApp dial code to the served
+  // market the visitor is actually in so cross-country registration is
+  // impossible (a Kuwait visitor gets +965, a UAE visitor gets +971).
+  const detectedCountry = useSelector((state) => state.locale?.country);
+  const registrationCountry = (() => {
+    const normalized = normalizeCountry(detectedCountry);
+    return SERVED_REGISTRATION_MARKETS.includes(normalized)
+      ? normalized
+      : DEFAULT_COUNTRY;
+  })();
+  const lockedCountryConfig = getCountryConfig(registrationCountry);
+  const lockedPhoneCode = lockedCountryConfig.phoneCode;
+  const lockedCountryName = lockedCountryConfig.displayName;
+
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem("activeTab") || "commuters";
+  });
+
+  const svgProps = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+  const roles = [
+    {
+      id: "COMMUTER",
+      label: "COMMUTER",
+      icon: (
+        <svg {...svgProps}>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+        </svg>
+      ),
+    },
+    {
+      id: "CORPORATE",
+      label: "CORPORATE",
+      icon: (
+        <svg {...svgProps}>
+          <path d="M3 21h18" />
+          <path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
+          <path d="M15 9h2a2 2 0 0 1 2 2v10" />
+          <path d="M9 7h2M9 11h2M9 15h2" />
+        </svg>
+      ),
+    },
+    {
+      id: "B2C_PARTNER",
+      label: "B2C PARTNER",
+      icon: (
+        <svg {...svgProps}>
+          <path d="M14 16H9m10 0h1.5a1.5 1.5 0 0 0 1.5-1.5v-3.2a2 2 0 0 0-.6-1.4L18 5.6A2 2 0 0 0 16.6 5H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h1" />
+          <circle cx="6.5" cy="16.5" r="2.5" />
+          <circle cx="16.5" cy="16.5" r="2.5" />
+        </svg>
+      ),
+    },
+    {
+      id: "B2B_PARTNER",
+      label: "B2B PARTNER",
+      icon: (
+        <svg {...svgProps}>
+          <path d="M2 20h20" />
+          <path d="M4 20V8l6-4 6 4v12" />
+          <path d="M16 20V11l4 2v7" />
+          <path d="M8 10h2M8 14h2" />
+        </svg>
+      ),
+    },
+    {
+      id: "SCHOOL_CUSTOMER",
+      label: "SCHOOL CUSTOMER",
+      icon: (
+        <svg {...svgProps}>
+          <path d="M22 10 12 5 2 10l10 5 10-5z" />
+          <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
+        </svg>
+      ),
+    },
+    {
+      id: "SCHOOL_PARTNER",
+      label: "SCHOOL PARTNER",
+      icon: (
+        <svg {...svgProps}>
+          <path d="M4 17h16V8a2 2 0 0 0-2-2H4v11z" />
+          <path d="M4 11h16" />
+          <path d="M8 6V4h8v2" />
+          <circle cx="8" cy="19" r="1.6" />
+          <circle cx="16" cy="19" r="1.6" />
+        </svg>
+      ),
+    },
+  ];
+
+  // School roles reuse the corporate/partner registration form and behaviour.
+  // SCHOOL_CUSTOMER mirrors CORPORATE; SCHOOL_PARTNER mirrors B2B_PARTNER.
+  const isCorporateLike =
+    selectedRole === "CORPORATE" || selectedRole === "SCHOOL_CUSTOMER";
+  const isB2BLike =
+    selectedRole === "B2B_PARTNER" || selectedRole === "SCHOOL_PARTNER";
+
+  const roleRedirectMap = {
+    COMMUTER: "/",
+    CORPORATE: "/",
+    B2C_PARTNER: "/",
+    B2B_PARTNER: "/",
+    CORPORATE_EMPLOYEE: "/",
+    SCHOOL_CUSTOMER: "/",
+    SCHOOL_PARTNER: "/",
+  };
+
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    countryCode: getCountryConfig(DEFAULT_COUNTRY).phoneCode, // Overwritten by detected market (locked)
+    whatsappNumber: "",
+    password: "",
+    companyName: "",
+    companyAddress: "",
+    companyLogo: null,
+    tradeLicense: null,
+    profileImage: null,
+    serviceType: "",
+    yearsOfExperience: "",
+    serviceDescription: "",
+    fleetManagement: [
+      {
+        vehicleType: "",
+        model: "",
+        year: "",
+        seatingCapacity: "",
+        quantityAvailable: "",
+        images: [],
+      },
+    ],
+    routeListings: [
+      {
+        fromLocation: "",
+        toLocation: "",
+        inboundStart: "",
+        routeStartDate: "",
+        oneWayPrice: "",
+        roundTripPrice: "",
+        totalSeats: "",
+        availableSeats: "",
+        monthlyPrice: "",
+        stopPoints: [], // [{ location, time }]
+        driverImage: null,
+        availableDays: [],
+        driverName: "",
+        nationality: "",
+        licenseNumber: "",
+        experience: "",
+        vehicleModel: "",
+        vehiclePlate: "",
+        images: [],
+      },
+    ],
+    acceptedPaymentMethods: [],
+  });
+
+  const toggleDay = (day, routeIndex) => {
+    const routes = [...formData.routeListings];
+    const days = routes[routeIndex].availableDays || [];
+
+    routes[routeIndex].availableDays = days.includes(day)
+      ? days.filter((d) => d !== day)
+      : [...days, day];
+
+    setFormData({ ...formData, routeListings: routes });
+  };
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    dispatch(authError(""));
+    // Reset T&C acceptance when role changes
+    setTermsAccepted(false);
+    setFormData((prev) => ({
+      ...prev,
+      acceptedPaymentMethods: [],
+    }));
+  };
+
+  // Roles that require T&C acceptance
+  const rolesRequiringTerms = [
+    "CORPORATE",
+    "B2B_PARTNER",
+    "B2C_PARTNER",
+    "SCHOOL_CUSTOMER",
+    "SCHOOL_PARTNER",
+  ];
+  const requiresTerms = rolesRequiringTerms.includes(selectedRole);
+
+  // Fetch commission range when role changes
+  // Keep the WhatsApp dial code locked to the visitor's detected served market.
+  // Runs on mount and whenever detection resolves/updates the locale country.
+  useEffect(() => {
+    setFormData((prev) =>
+      prev.countryCode === lockedPhoneCode
+        ? prev
+        : { ...prev, countryCode: lockedPhoneCode },
+    );
+  }, [lockedPhoneCode]);
+
+  useEffect(() => {
+    const fetchCommissionRange = async () => {
+      if (requiresTerms) {
+        try {
+          const response = await api.get(`/terms/latest?role=${selectedRole}`);
+          if (response.data.success && response.data.data) {
+            const data = response.data.data;
+            const roleKeyMap = {
+              B2C_PARTNER: "b2cPartner",
+              B2B_PARTNER: "b2bPartner",
+              CORPORATE: "corporate",
+              SCHOOL_CUSTOMER: "corporate",
+              SCHOOL_PARTNER: "b2bPartner",
+            };
+            const roleKey = roleKeyMap[selectedRole];
+            const range = data.commissionRange ||
+              data.commissionRanges?.[roleKey] || { min: 0, max: 35 };
+            setCommissionRange(range);
+          }
+        } catch (err) {
+          console.error("Error fetching commission range:", err);
+          setCommissionRange({ min: 0, max: 35 });
+        }
+      }
+    };
+    fetchCommissionRange();
+  }, [selectedRole, requiresTerms]);
+
+  const handleTermsAccept = (termsData) => {
+    setTermsAccepted(true);
+    setTermsVersion(termsData.version);
+    setShowTermsModal(false);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    dispatch(clearError());
+  };
+
+  const handleFileChange = (e) => {
+    const { name } = e.target;
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({
+          ...prev,
+          [name]: {
+            file: file,
+            preview: reader.result,
+            fileName: file.name,
+          },
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // const handleVehicleChange = (index, field, value) => {
+  //   const updatedFleet = [...formData.fleetManagement];
+  //   updatedFleet[index][field] = value;
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     fleetManagement: updatedFleet,
+  //   }));
+  // };
+
+  // const handleVehicleImageChange = (vehicleIndex, imageIndex, file) => {
+  //   const updatedFleet = [...formData.fleetManagement];
+  //   const imageArray = [...(updatedFleet[vehicleIndex].images || [])];
+
+  //   if (file) {
+  //     const reader = new FileReader();
+  //     reader.onloadend = () => {
+  //       imageArray[imageIndex] = {
+  //         file: file,
+  //         preview: reader.result,
+  //         fileName: file.name,
+  //       };
+  //       updatedFleet[vehicleIndex].images = imageArray.filter(
+  //         (img) => img !== undefined
+  //       );
+  //       setFormData((prev) => ({
+  //         ...prev,
+  //         fleetManagement: updatedFleet,
+  //       }));
+  //     };
+  //     reader.readAsDataURL(file);
+  //   }
+  // };
+
+  // const removeVehicleImage = (vehicleIndex, imageIndex) => {
+  //   const updatedFleet = [...formData.fleetManagement];
+  //   updatedFleet[vehicleIndex].images = updatedFleet[
+  //     vehicleIndex
+  //   ].images.filter((_, idx) => idx !== imageIndex);
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     fleetManagement: updatedFleet,
+  //   }));
+  // };
+
+  // const canAddMoreVehicleImages = (vehicleIndex) => {
+  //   return (formData.fleetManagement[vehicleIndex].images || []).length < 10;
+  // };
+
+  // const addVehicle = () => {
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     fleetManagement: [
+  //       ...prev.fleetManagement,
+  //       {
+  //         vehicleType: "",
+  //         model: "",
+  //         year: "",
+  //         seatingCapacity: "",
+  //         quantityAvailable: "",
+  //         images: [],
+  //       },
+  //     ],
+  //   }));
+  // };
+
+  // const deleteVehicle = (index) => {
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     fleetManagement: prev.fleetManagement.filter((_, i) => i !== index),
+  //   }));
+  // };
+
+  const handleRouteChange = (index, field, value) => {
+    setFormData((prev) => {
+      const routes = [...prev.routeListings];
+      if (!routes[index]) return prev;
+      routes[index][field] = value;
+      return { ...prev, routeListings: routes };
+    });
+  };
+
+  // const handleRouteChange = (index, field, value) => {
+  //   const updatedRoutes = [...formData.routeListings];
+  //   updatedRoutes[index][field] = value;
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     routeListings: updatedRoutes,
+  //   }));
+  // };
+
+  // const handleStopPointChange = (routeIndex, stopIndex, value) => {
+  //   const updatedRoutes = [...formData.routeListings];
+  //   const updatedStopPoints = [...updatedRoutes[routeIndex].stopPoints];
+  //   updatedStopPoints[stopIndex] = value;
+  //   updatedRoutes[routeIndex].stopPoints = updatedStopPoints;
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     routeListings: updatedRoutes,
+  //   }));
+  // };
+
+  const addStopPoint = (routeIndex) => {
+    const routes = [...formData.routeListings];
+    routes[routeIndex].stopPoints.push({ location: "", time: "" });
+    setFormData({ ...formData, routeListings: routes });
+  };
+
+  const removeStopPoint = (routeIndex, stopIndex) => {
+    const updatedRoutes = [...formData.routeListings];
+    updatedRoutes[routeIndex].stopPoints = updatedRoutes[
+      routeIndex
+    ].stopPoints.filter((_, idx) => idx !== stopIndex);
+    setFormData((prev) => ({
+      ...prev,
+      routeListings: updatedRoutes,
+    }));
+  };
+
+  const handleRouteImageChange = (routeIndex, imageIndex, file) => {
+    const updatedRoutes = [...formData.routeListings];
+    const imageArray = [...(updatedRoutes[routeIndex].images || [])];
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        imageArray[imageIndex] = {
+          file: file,
+          preview: reader.result,
+          fileName: file.name,
+        };
+        updatedRoutes[routeIndex].images = imageArray.filter(
+          (img) => img !== undefined,
+        );
+        setFormData((prev) => ({
+          ...prev,
+          routeListings: updatedRoutes,
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeRouteImage = (routeIndex, imageIndex) => {
+    const updatedRoutes = [...formData.routeListings];
+    updatedRoutes[routeIndex].images = updatedRoutes[routeIndex].images.filter(
+      (_, idx) => idx !== imageIndex,
+    );
+    setFormData((prev) => ({
+      ...prev,
+      routeListings: updatedRoutes,
+    }));
+  };
+
+  const canAddMoreRouteImages = (routeIndex) => {
+    return (formData.routeListings[routeIndex].images || []).length < 10;
+  };
+
+  const handleCompanyLogoChange = (file) => {
+    if (!file) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      companyLogo: {
+        file,
+        preview: URL.createObjectURL(file),
+      },
+    }));
+  };
+
+  const removeCompanyLogo = () => {
+    setFormData((prev) => ({
+      ...prev,
+      companyLogo: null,
+    }));
+  };
+
+  const handleDriverImageChange = (routeIndex, file) => {
+    if (!file) return;
+
+    const routes = [...formData.routeListings];
+    routes[routeIndex].driverImage = {
+      file,
+      preview: URL.createObjectURL(file),
+      fileName: file.name,
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      routeListings: routes,
+    }));
+  };
+
+  const removeDriverImage = (routeIndex) => {
+    const routes = [...formData.routeListings];
+    routes[routeIndex].driverImage = null;
+
+    setFormData((prev) => ({
+      ...prev,
+      routeListings: routes,
+    }));
+  };
+
+  const addRoute = () => {
+    setFormData((prev) => ({
+      ...prev,
+      routeListings: [
+        ...prev.routeListings,
+        {
+          fromLocation: "",
+          toLocation: "",
+          inboundStart: "",
+          routeStartDate: "",
+          oneWayPrice: "",
+          roundTripPrice: "",
+          totalSeats: "",
+          availableSeats: "",
+          stopPoints: [],
+          driverName: "",
+          nationality: "",
+          licenseNumber: "",
+          experience: "",
+          vehicleModel: "",
+          vehiclePlate: "",
+          images: [],
+        },
+      ],
+    }));
+  };
+
+  const deleteRoute = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      routeListings: prev.routeListings.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    setFormData((prev) => ({
+      ...prev,
+      acceptedPaymentMethods: prev.acceptedPaymentMethods.includes(method)
+        ? prev.acceptedPaymentMethods.filter((m) => m !== method)
+        : [...prev.acceptedPaymentMethods, method],
+    }));
+  };
+
+  const validateForm = () => {
+    if (
+      !formData.fullName ||
+      !formData.email ||
+      !formData.whatsappNumber ||
+      !formData.password
+    ) {
+      dispatch(authError("Please fill in all required fields"));
+      return false;
+    }
+
+    if (
+      isCorporateLike &&
+      (!formData.companyName || !formData.companyAddress)
+    ) {
+      dispatch(
+        authError(
+          selectedRole === "SCHOOL_CUSTOMER"
+            ? "Please fill in your school details"
+            : "Please fill in company details"
+        )
+      );
+      return false;
+    }
+
+    if (selectedRole === "CORPORATE_EMPLOYEE" && !formData.companyName) {
+      dispatch(
+        authError(
+          "Company name is required for corporate employee registration",
+        ),
+      );
+      return false;
+    }
+
+    if (selectedRole === "B2C_PARTNER") {
+      if (!formData.serviceType || !formData.yearsOfExperience) {
+        dispatch(authError("Please fill in all service provider information"));
+        return false;
+      }
+    }
+
+    // if (selectedRole === "B2B_PARTNER") {
+    //   let hasAtLeastOneVehicleWithImage = false;
+    //   for (const vehicle of formData.fleetManagement) {
+    //     if (vehicle.images && vehicle.images.length > 0) {
+    //       hasAtLeastOneVehicleWithImage = true;
+    //       break;
+    //     }
+    //   }
+
+    //   if (
+    //     formData.fleetManagement.length === 0 ||
+    //     !hasAtLeastOneVehicleWithImage ||
+    //     formData.acceptedPaymentMethods.length === 0
+    //   ) {
+    //     dispatch(
+    //       authError(
+    //         "Please add at least one vehicle with at least one image and select payment methods"
+    //       )
+    //     );
+    //     return false;
+    //   }
+    // }
+
+    if (isB2BLike) {
+      if (formData.acceptedPaymentMethods.length === 0) {
+        dispatch(authError("Please select payment methods"));
+        return false;
+      }
+    }
+
+    // Validate T&C acceptance for roles that require it
+    if (requiresTerms && !termsAccepted) {
+      dispatch(authError("Please accept the Terms and Conditions to continue"));
+      return false;
+    }
+
+    return true;
+  };
+
+  console.log("Frontend formData By User", formData);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    setSuccess("");
+    dispatch(authError(""));
+
+    if (!validateForm()) {
+      return;
+    }
+
+    dispatch(authStart());
+
+    try {
+      const submitData = new FormData();
+      submitData.append("role", selectedRole);
+      submitData.append("fullName", formData.fullName);
+      submitData.append("email", formData.email);
+      // Combine country code and phone number
+      const fullWhatsappNumber = `${formData.countryCode}${formData.whatsappNumber.replace(/^0+/, "")}`;
+      submitData.append("whatsappNumber", fullWhatsappNumber);
+      submitData.append("countryCode", formData.countryCode);
+      submitData.append("password", formData.password);
+
+      // Add T&C acceptance data for applicable roles
+      if (requiresTerms && termsAccepted) {
+        submitData.append("termsAccepted", "true");
+        submitData.append("termsVersion", termsVersion);
+      }
+
+      if (formData.companyLogo) {
+        submitData.append("companyLogo", formData.companyLogo.file);
+      }
+
+      // Add profile image for COMMUTER
+      if (selectedRole === "COMMUTER" && formData.profileImage?.file) {
+        submitData.append("profileImage", formData.profileImage.file);
+      }
+
+      if (isCorporateLike) {
+        submitData.append("companyName", formData.companyName);
+        submitData.append("companyAddress", formData.companyAddress);
+        if (formData.tradeLicense?.file) {
+          submitData.append("tradeLicense", formData.tradeLicense.file);
+        }
+      }
+
+      if (isB2BLike) {
+        // Add profile image for B2B / School Partner
+        if (formData.profileImage?.file) {
+          submitData.append("profileImage", formData.profileImage.file);
+        }
+        submitData.append(
+          "acceptedPaymentMethods",
+          JSON.stringify(formData.acceptedPaymentMethods),
+        );
+      }
+
+      if (selectedRole === "CORPORATE_EMPLOYEE") {
+        submitData.append("companyName", formData.companyName);
+        console.log("CORPORATE_EMPLOYEE Registration Data:", {
+          role: selectedRole,
+          fullName: formData.fullName,
+          email: formData.email,
+          companyName: formData.companyName,
+        });
+      }
+
+      if (selectedRole === "B2C_PARTNER") {
+        submitData.append("serviceType", formData.serviceType);
+        submitData.append("yearsOfExperience", formData.yearsOfExperience);
+        submitData.append("serviceDescription", formData.serviceDescription);
+
+        // Add profile image for B2C Partner
+        if (formData.profileImage?.file) {
+          submitData.append("profileImage", formData.profileImage.file);
+        }
+
+        submitData.append(
+          "acceptedPaymentMethods",
+          JSON.stringify(formData.acceptedPaymentMethods),
+        );
+      }
+
+      console.log("submitData", submitData);
+
+      const response = await api.post("/auth/register", submitData, {
+        withCredentials: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (response.data.success) {
+        if (response.data.requiresVerification) {
+          // Show OTP verification screen
+          setPendingEmail(response.data.email);
+          setShowOTPVerification(true);
+          setSuccess(
+            "Registration initiated! Please check your email for verification code.",
+          );
+          showSuccess(
+            "Registration initiated! Check your email for the verification code.",
+          );
+        } else {
+          // Legacy flow (shouldn't happen with new backend)
+          dispatch(
+            loginSuccess({
+              user: response.data.user,
+              token: response.data.token,
+            }),
+          );
+
+          localStorage.setItem("token", response.data.token);
+          localStorage.setItem("user", JSON.stringify(response.data.user));
+          setSuccess("Registration successful! Redirecting...");
+
+          const userRole = response.data.user?.role;
+          const redirectPath = roleRedirectMap[userRole] || "/login";
+
+          setTimeout(() => {
+            navigate(redirectPath);
+          }, 1500);
+        }
+      }
+    } catch (err) {
+      dispatch(
+        authError(
+          err.response?.data?.message ||
+            "Registration failed. Please try again.",
+        ),
+      );
+      showError(err, "Registration failed. Please try again.");
+      console.error("Registration error:", err);
+    }
+  };
+
+  const handleBackToRegister = () => {
+    setShowOTPVerification(false);
+    setPendingEmail("");
+    setSuccess("");
+  };
+
+  const handleOTPVerified = (user) => {
+    setShowOTPVerification(false);
+    setSuccess("Email verified and registration completed successfully!");
+    showSuccess("Email verified! Your registration is complete.");
+
+    const userRole = user?.role;
+    const redirectPath = roleRedirectMap[userRole] || "/dashboard";
+
+    setTimeout(() => {
+      navigate(redirectPath);
+    }, 1500);
+  };
+
+  return (
+    <div>
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {showOTPVerification ? (
+        <OTPVerification
+          email={pendingEmail}
+          onBack={handleBackToRegister}
+          onSuccess={handleOTPVerified}
+        />
+      ) : (
+        <div className="register-container">
+          <div className="register-card">
+          <div className="register-header">
+            <span className="register-brand-eyebrow">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width="13"
+                height="13"
+              >
+                <path d="M3 11l19-9-9 19-2-8-8-2z" />
+              </svg>
+              Drive Me Go
+            </span>
+            <h1 className="register-title">Create your account</h1>
+            <p className="register-subtitle">
+              Join thousands of commuters riding verified daily routes.
+            </p>
+          </div>
+
+            {error && <div className="register-error-message">{error}</div>}
+            {success && (
+              <div className="register-success-message">{success}</div>
+            )}
+
+            <div className="register-role-selector">
+              {roles.map((role) => (
+                <button
+                  key={role.id}
+                  className={`register-role-button ${
+                    selectedRole === role.id ? "register-active" : ""
+                  }`}
+                  onClick={() => handleRoleSelect(role.id)}
+                  type="button"
+                >
+                  <span className="register-role-button-icon">{role.icon}</span>
+                  <span className="register-role-button-text">
+                    {role.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="register-form-divider"></div>
+
+            <form onSubmit={handleSubmit}>
+              {/* Common Fields for All Roles */}
+              <div className="register-form-row">
+                <div className="register-form-group">
+                  <label className="register-form-label">
+                    {selectedRole === "CORPORATE_EMPLOYEE"
+                      ? "Employee Name"
+                      : "Full Name"}{" "}
+                    <span className="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="register-form-input"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    placeholder={
+                      selectedRole === "CORPORATE_EMPLOYEE"
+                        ? "Enter employee name"
+                        : "Enter your name"
+                    }
+                    required
+                  />
+                </div>
+                <div className="register-form-group">
+                  <label className="register-form-label">
+                    WhatsApp Number <span className="register-required">*</span>
+                  </label>
+                  <div className="register-phone-input-container">
+                    {/* Dial code is auto-selected from the visitor's detected
+                        country and locked — this prevents registering with a
+                        different country's number (e.g. UAE visitor using a
+                        Kuwait code). */}
+                    <div
+                      className="register-country-code-wrapper register-country-code-locked"
+                      title={`Country auto-detected: ${lockedCountryName}`}
+                    >
+                      <span className="register-country-code-display">
+                        {lockedPhoneCode}
+                      </span>
+                    </div>
+                    <input
+                      type="tel"
+                      className="register-form-input register-phone-number-input"
+                      name="whatsappNumber"
+                      value={formData.whatsappNumber}
+                      onChange={handleInputChange}
+                      placeholder="50 123 4567"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="register-form-row">
+                <div className="register-form-group">
+                  <label className="register-form-label">
+                    Email Address <span className="register-required">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="register-form-input"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="your@email.com"
+                    required
+                  />
+                </div>
+                <div className="register-form-group">
+                  <label className="register-form-label">
+                    Password <span className="register-required">*</span>
+                  </label>
+                  <div className="register-password-wrapper">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="register-form-input register-password-input"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="register-password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showPassword ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="17"
+                          height="17"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="17"
+                          height="17"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Image for COMMUTER and B2B / School Partner */}
+              {(selectedRole === "COMMUTER" || isB2BLike) && (
+                <div className="register-form-row">
+                  <div className="register-form-group register-profile-image-group">
+                    <label className="register-form-label">
+                      Profile Image{" "}
+                      <span className="register-optional">(optional)</span>
+                    </label>
+                    <div className="register-profile-image-container">
+                      {formData.profileImage?.preview ? (
+                        <div className="register-profile-preview-wrapper">
+                          <img
+                            src={formData.profileImage.preview}
+                            alt="Profile preview"
+                            className="register-profile-preview"
+                          />
+                          <button
+                            type="button"
+                            className="register-profile-remove-btn"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                profileImage: null,
+                              }))
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="register-file-input-wrapper register-profile-file-wrapper">
+                          <input
+                            type="file"
+                            id="profileImage"
+                            name="profileImage"
+                            onChange={handleFileChange}
+                            accept="image/*"
+                          />
+                          <label
+                            htmlFor="profileImage"
+                            className="register-file-input-label register-profile-label"
+                          >
+                            <span className="register-profile-icon">📷</span>
+                            <span>Upload Photo</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Corporate / School Customer Role Specific */}
+              {isCorporateLike && (
+                <>
+                  <div className="register-form-divider"></div>
+                  <div className="register-corp-section-header">
+                    <span className="register-section-icon">
+                      {selectedRole === "SCHOOL_CUSTOMER" ? (
+                        <svg {...svgProps}>
+                          <path d="M22 10 12 5 2 10l10 5 10-5z" />
+                          <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
+                        </svg>
+                      ) : (
+                        <svg {...svgProps}>
+                          <path d="M3 21h18" />
+                          <path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
+                          <path d="M15 9h2a2 2 0 0 1 2 2v10" />
+                          <path d="M9 7h2M9 11h2M9 15h2" />
+                        </svg>
+                      )}
+                    </span>
+                    <span>
+                      {selectedRole === "SCHOOL_CUSTOMER"
+                        ? "School Details"
+                        : "Company Details"}
+                    </span>
+                  </div>
+
+                  <div className="register-form-row">
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        {selectedRole === "SCHOOL_CUSTOMER"
+                          ? "School Name"
+                          : "Company Name"}
+                      </label>
+                      <input
+                        type="text"
+                        className="register-form-input"
+                        name="companyName"
+                        value={formData.companyName}
+                        onChange={handleInputChange}
+                        placeholder={
+                          selectedRole === "SCHOOL_CUSTOMER"
+                            ? "e.g. Al Noor International School"
+                            : "e.g. ABC Trading Co."
+                        }
+                      />
+                    </div>
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        Trade License / Logo
+                      </label>
+                      <div className="register-file-input-wrapper">
+                        <input
+                          type="file"
+                          id="tradeLicense"
+                          name="tradeLicense"
+                          onChange={handleFileChange}
+                          accept="image/*,.pdf"
+                        />
+                        <label
+                          htmlFor="tradeLicense"
+                          className="register-file-input-label"
+                        >
+                          {formData.tradeLicense
+                            ? `${formData.tradeLicense.fileName} ✓`
+                            : "Choose File"}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="register-form-row full">
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        {selectedRole === "SCHOOL_CUSTOMER"
+                          ? "School Address"
+                          : "Company Address"}
+                      </label>
+                      <textarea
+                        className="register-form-input"
+                        name="companyAddress"
+                        value={formData.companyAddress}
+                        onChange={handleInputChange}
+                        placeholder={
+                          selectedRole === "SCHOOL_CUSTOMER"
+                            ? "Full school address..."
+                            : "Full office address..."
+                        }
+                      ></textarea>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Corporate Employee Specific */}
+              {/* {selectedRole === "CORPORATE_EMPLOYEE" && (
+                <>
+                  <div className="register-form-divider"></div>
+                  <div className="register-corp-section-header">
+                    <span className="register-section-icon">👔</span>
+                    <span>Company Information</span>
+                  </div>
+
+                  <div className="register-form-row">
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        Company Name{" "}
+                        <span className="register-required">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="register-form-input"
+                        name="companyName"
+                        value={formData.companyName}
+                        onChange={handleInputChange}
+                        placeholder="e.g. MillPixel Software Solutions"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )} */}
+
+              {/* B2C Partner Specific - Simple Registration (no company fields) */}
+              {selectedRole === "B2C_PARTNER" && (
+                <>
+                  <div className="register-form-divider"></div>
+                  <div className="register-corp-section-header">
+                    <span className="register-section-icon">
+                      <svg {...svgProps}>
+                        <path d="M14 16H9m10 0h1.5a1.5 1.5 0 0 0 1.5-1.5v-3.2a2 2 0 0 0-.6-1.4L18 5.6A2 2 0 0 0 16.6 5H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h1" />
+                        <circle cx="6.5" cy="16.5" r="2.5" />
+                        <circle cx="16.5" cy="16.5" r="2.5" />
+                      </svg>
+                    </span>
+                    <span>Service Provider Information</span>
+                  </div>
+
+                  <div className="register-form-row">
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        Service Type
+                      </label>
+                      <select
+                        className="register-form-input"
+                        name="serviceType"
+                        value={formData.serviceType || ""}
+                        onChange={handleInputChange}
+                      >
+                        <option value="">Select service type</option>
+                        <option value="individual">
+                          Individual Vehicle Owner
+                        </option>
+                        <option value="smallfleet">Small Fleet Owner</option>
+                      </select>
+                    </div>
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        Years of Experience
+                      </label>
+                      <input
+                        type="number"
+                        className="register-form-input"
+                        name="yearsOfExperience"
+                        placeholder="0"
+                        value={formData.yearsOfExperience || ""}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="register-form-row">
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        Profile Image / Logo
+                      </label>
+                      <div className="register-file-input-wrapper">
+                        <input
+                          type="file"
+                          id="profileImage"
+                          name="profileImage"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setFormData((prev) => ({
+                                ...prev,
+                                profileImage: {
+                                  file: file,
+                                  preview: URL.createObjectURL(file),
+                                  fileName: file.name,
+                                },
+                              }));
+                            }
+                          }}
+                          accept="image/*"
+                        />
+                        <label
+                          htmlFor="profileImage"
+                          className="register-file-input-label"
+                        >
+                          {formData.profileImage
+                            ? `${formData.profileImage.fileName} ✓`
+                            : "Choose Profile Image"}
+                        </label>
+                      </div>
+                      {formData.profileImage?.preview && (
+                        <div
+                          style={{
+                            marginTop: "10px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                          }}
+                        >
+                          <img
+                            src={formData.profileImage.preview}
+                            alt="Profile Preview"
+                            style={{
+                              width: "60px",
+                              height: "60px",
+                              objectFit: "cover",
+                              borderRadius: "50%",
+                              border: "2px solid #ddd",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                profileImage: null,
+                              }))
+                            }
+                            style={{
+                              padding: "5px 10px",
+                              background: "#dc3545",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="register-form-row register-full">
+                    <div className="register-form-group">
+                      <label className="register-form-label">
+                        Brief Description about your services
+                      </label>
+                      <textarea
+                        className="register-form-input"
+                        name="serviceDescription"
+                        placeholder="Tell us about your transportation services..."
+                        value={formData.serviceDescription || ""}
+                        onChange={handleInputChange}
+                        rows="3"
+                      ></textarea>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Payment Methods */}
+              {(isB2BLike || selectedRole === "B2C_PARTNER") && (
+                <>
+                  <div className="register-form-divider"></div>
+                  <div className="register-corp-section-header">
+                    <span className="register-section-icon">💳</span>
+                    <span>Payment Methods</span>
+                  </div>
+                  <div className="register-payment-methods">
+                    {[
+                      "Cash",
+                      "Credit Card",
+                      "Bank Transfer",
+                      "Mobile Wallet",
+                    ].map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        className={`register-payment-option ${
+                          formData.acceptedPaymentMethods.includes(method)
+                            ? "register-selected"
+                            : ""
+                        }`}
+                        onClick={() => handlePaymentMethodChange(method)}
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Terms and Conditions for applicable roles */}
+              {requiresTerms && (
+                <div className="register-terms-section">
+                  <div className="register-terms-checkbox-wrapper">
+                    <label className="register-terms-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={() => {
+                          if (!termsAccepted) {
+                            setShowTermsModal(true);
+                          } else {
+                            setTermsAccepted(false);
+                          }
+                        }}
+                        className="register-terms-checkbox"
+                      />
+                      <span className="register-terms-checkmark"></span>
+                      <span className="register-terms-text">
+                        I have read and agree to the{" "}
+                        <button
+                          type="button"
+                          className="register-terms-link"
+                          onClick={() => setShowTermsModal(true)}
+                        >
+                          Terms and Conditions
+                        </button>
+                      </span>
+                    </label>
+                    {termsAccepted && (
+                      <span className="register-terms-accepted-badge">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                          <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        Terms Accepted (v{termsVersion})
+                      </span>
+                    )}
+                  </div>
+                  <p className="register-terms-commission-note">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    A commission of {commissionRange.min}% to{" "}
+                    {commissionRange.max}% may apply based on your transactions.
+                    Review the terms for complete details.
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="register-submit-btn"
+                disabled={loading || (requiresTerms && !termsAccepted)}
+              >
+                {loading ? "Creating Account..." : "Create Account"}
+              </button>
+
+              <p className="register-secure-note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                Your details are encrypted and never shared.
+              </p>
+            </form>
+
+            <div className="register-signin-link">
+              Already have an account? <Link to="/login">Sign in here</Link>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Terms and Conditions Modal */}
+      <TermsAndConditionsModal
+        isOpen={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+        onAccept={handleTermsAccept}
+        userRole={selectedRole}
+      />
+
+      <Footer />
+    </div>
+  );
+};
+
+export default Register;

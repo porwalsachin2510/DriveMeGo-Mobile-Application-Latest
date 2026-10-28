@@ -1,0 +1,389 @@
+.dmg-travel-history-container {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dmg-travel-history-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dmg-travel-history-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+.dmg-filters {
+  display: flex;
+  gap: 12px;
+}
+
+.dmg-filters select {
+  padding: 8px 12px;
+  border: 1px solid var(--dmg-line);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.dmg-error-message {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.dmg-travel-history-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.dmg-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--dmg-bg);
+  border-top: 3px solid var(--dmg-teal);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.dmg-no-history {
+  text-align: center;
+  padding: 40px;
+  color: var(--dmg-muted);
+}
+
+.dmg-travel-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dmg-travel-history-item {
+  border: 1px solid var(--dmg-line);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 120px 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.dmg-travel-history-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dmg-trip-date {
+  text-align: center;
+}
+
+.dmg-trip-date .dmg-date {
+  font-weight: 600;
+  color: var(--dmg-navy);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.dmg-trip-date .dmg-time {
+  color: var(--dmg-muted);
+  font-size: 12px;
+}
+
+.dmg-trip-route {
+  flex: 1;
+}
+
+.dmg-route-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.dmg-pickup {
+  color: #059669;
+}
+
+.dmg-dropoff {
+  color: #dc2626;
+}
+
+.dmg-arrow {
+  color: var(--dmg-muted);
+  font-size: 16px;
+}
+
+.dmg-trip-details {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--dmg-muted);
+}
+
+.dmg-trip-status {
+  text-align: center;
+}
+
+.dmg-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.dmg-status.completed {
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
+.dmg-status.dmg-cancelled {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.dmg-status.dmg-no_show {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+.dmg-rating {
+  margin-top: 4px;
+  color: #fbbf24;
+  font-size: 14px;
+}
+
+.dmg-trip-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dmg-rate-btn {
+  background-color: var(--dmg-teal);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dmg-rate-btn:hover {
+  background-color: var(--dmg-teal-600);
+}
+
+.dmg-no-show-badge {
+  background-color: #fbbf24;
+  color: #92400e;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: default;
+}
+
+.dmg-rating-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dmg-rating-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.dmg-rating-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--dmg-line);
+}
+
+.dmg-rating-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+.dmg-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--dmg-muted);
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.dmg-close-btn:hover {
+  background-color: var(--dmg-bg);
+  color: var(--dmg-navy);
+}
+
+.dmg-rating-form {
+  padding: 20px;
+}
+
+.dmg-trip-summary {
+  background-color: var(--dmg-bg);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.dmg-trip-summary p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--dmg-ink);
+}
+
+.dmg-form-group {
+  margin-bottom: 20px;
+}
+
+.dmg-form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--dmg-ink);
+  font-size: 14px;
+}
+
+.dmg-star-rating {
+  display: flex;
+  gap: 4px;
+}
+
+.dmg-star-rating .dmg-star {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--dmg-line);
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.dmg-star-rating .dmg-star:hover,
+.dmg-star-rating .dmg-star.dmg-active {
+  color: #fbbf24;
+}
+
+.dmg-form-group textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--dmg-line);
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.dmg-form-group textarea:focus {
+  outline: none;
+  border-color: var(--dmg-teal);
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.1);
+}
+
+.dmg-form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.dmg-cancel-btn,
+.dmg-submit-btn {
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.dmg-cancel-btn {
+  background-color: var(--dmg-bg);
+  color: var(--dmg-ink);
+}
+
+.dmg-cancel-btn:hover {
+  background-color: var(--dmg-line);
+}
+
+.dmg-submit-btn {
+  background-color: var(--dmg-teal);
+  color: white;
+}
+
+.dmg-submit-btn:hover {
+  background-color: var(--dmg-teal-600);
+}
+
+@media (max-width: 768px) {
+  .dmg-travel-history-item {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .dmg-trip-date {
+    text-align: left;
+    border-bottom: 1px solid var(--dmg-line);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .dmg-trip-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+  
+  .dmg-rating-modal {
+    width: 95%;
+    margin: 20px;
+  }
+}

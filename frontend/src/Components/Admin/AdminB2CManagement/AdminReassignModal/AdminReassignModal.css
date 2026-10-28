@@ -1,0 +1,476 @@
+.drivemego-ad-dash-reassign-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.drivemego-ad-dash-reassign-modal {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-ad-dash-reassign-modal.drivemego-ad-dash-reassign-modal-large {
+  max-width: 800px;
+}
+
+.drivemego-ad-dash-reassign-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 12px;
+}
+
+.drivemego-ad-dash-reassign-modal-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  flex: 1;
+}
+
+.drivemego-booking-status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.drivemego-ad-dash-reassign-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #64748b;
+  transition: color 0.2s;
+}
+
+.drivemego-ad-dash-reassign-modal-close:hover {
+  color: #334155;
+}
+
+.drivemego-ad-dash-reassign-modal-close svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+
+/* Tabs */
+.drivemego-ad-dash-reassign-modal-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.drivemego-modal-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.drivemego-modal-tab:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.drivemego-modal-tab.drivemego-active {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+}
+
+.drivemego-ad-dash-reassign-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.drivemego-modal-tab-content {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Detail Sections */
+.drivemego-booking-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.drivemego-detail-section {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.drivemego-detail-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drivemego-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drivemego-detail-row:last-child {
+  border-bottom: none;
+}
+
+.drivemego-detail-row.drivemego-highlight {
+  background: #e6f7fa;
+  margin: 0 -8px;
+  padding: 8px;
+  border-radius: 6px;
+  border-bottom: none;
+}
+
+.drivemego-detail-label {
+  font-size: 13px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.drivemego-detail-value {
+  font-size: 13px;
+  color: #1e293b;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+
+.drivemego-detail-value.drivemego-amount {
+  color: #059669;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.drivemego-detail-value.drivemego-mono {
+  font-family: monospace;
+  font-size: 12px;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.drivemego-detail-value.drivemego-status.drivemego-completed {
+  color: #059669;
+}
+
+.drivemego-detail-value.drivemego-status.drivemego-pending {
+  color: #d97706;
+}
+
+.drivemego-detail-value.drivemego-status.drivemego-failed {
+  color: #dc2626;
+}
+
+/* Profile Styles */
+.drivemego-passenger-profile,
+.drivemego-provider-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.drivemego-passenger-profile-image,
+.drivemego-provider-profile-image,
+.drivemego-driver-profile-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+}
+
+.drivemego-driver-profile-image {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+}
+
+.drivemego-passenger-profile-info h4,
+.drivemego-provider-profile-info h4 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.drivemego-passenger-email,
+.drivemego-passenger-phone,
+.drivemego-provider-phone {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.drivemego-self-badge {
+  display: inline-block;
+  background: #e6f7fa;
+  color: #0e97a8;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.drivemego-no-data {
+  font-size: 13px;
+  color: #94a3b8;
+  font-style: italic;
+  text-align: center;
+  padding: 16px;
+}
+
+/* Action Section */
+.drivemego-action-section {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.drivemego-action-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0 0 12px;
+}
+
+.drivemego-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.drivemego-action-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.drivemego-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.drivemego-action-btn.drivemego-approve {
+  background: #059669;
+  color: white;
+}
+
+.drivemego-action-btn.drivemego-approve:hover:not(:disabled) {
+  background: #047857;
+}
+
+.drivemego-action-btn.drivemego-reject {
+  background: #dc2626;
+  color: white;
+}
+
+.drivemego-action-btn.drivemego-reject:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.drivemego-action-btn.drivemego-cancel {
+  background: #6b7280;
+  color: white;
+}
+
+.drivemego-action-btn.drivemego-cancel:hover:not(:disabled) {
+  background: #4b5563;
+}
+
+.drivemego-action-btn.drivemego-reassign {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.drivemego-action-btn.reassign:hover:not(:disabled) {
+  background: #0e97a8;
+}
+
+.drivemego-ad-dash-reassign-modal-description {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 24px;
+  line-height: 1.6;
+}
+
+.drivemego-ad-dash-reassign-modal-description strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.drivemego-ad-dash-reassign-modal-description em {
+  color: #0e97a8;
+  font-style: normal;
+}
+
+.drivemego-ad-dash-reassign-modal-field {
+  margin-bottom: 20px;
+}
+
+.drivemego-ad-dash-reassign-modal-field:last-child {
+  margin-bottom: 0;
+}
+
+.drivemego-ad-dash-reassign-modal-field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.drivemego-ad-dash-reassign-modal-select,
+.drivemego-ad-dash-reassign-modal-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.drivemego-ad-dash-reassign-modal-select:focus,
+.drivemego-ad-dash-reassign-modal-textarea:focus {
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 4px #e6f7fa;
+}
+
+.drivemego-ad-dash-reassign-modal-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.drivemego-ad-dash-reassign-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.drivemego-ad-dash-reassign-modal-cancel,
+.drivemego-ad-dash-reassign-modal-confirm {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.drivemego-ad-dash-reassign-modal-cancel {
+  background: white;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.drivemego-ad-dash-reassign-modal-cancel:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.drivemego-ad-dash-reassign-modal-confirm {
+  background: linear-gradient(135deg, #12b0c4 0%, #0e97a8 100%);
+  color: white;
+}
+
+.drivemego-ad-dash-reassign-modal-confirm:hover:not(:disabled) {
+  background: #0e97a8;
+}
+
+.drivemego-ad-dash-reassign-modal-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .drivemego-ad-dash-reassign-modal {
+    max-width: 100%;
+    max-height: 95vh;
+  }
+
+  .drivemego-ad-dash-reassign-modal.drivemego-ad-dash-reassign-modal-large {
+    max-width: 100%;
+  }
+
+  .drivemego-ad-dash-reassign-modal-header,
+  .drivemego-ad-dash-reassign-modal-body,
+  .drivemego-ad-dash-reassign-modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .drivemego-ad-dash-reassign-modal-tabs {
+    padding: 12px 16px;
+  }
+
+  .drivemego-booking-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-quick-actions {
+    flex-direction: column;
+  }
+
+  .drivemego-action-btn {
+    width: 100%;
+  }
+}

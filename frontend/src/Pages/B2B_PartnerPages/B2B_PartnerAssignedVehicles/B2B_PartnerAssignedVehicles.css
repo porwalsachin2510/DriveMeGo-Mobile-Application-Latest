@@ -1,0 +1,548 @@
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-back-btn {
+  padding: 10px 20px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-back-btn:hover {
+  background: #e5e7eb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-header {
+  margin-bottom: 24px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-header .drivemego-b2b-partnerassignedvehiclespage-contract-info {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-tab-button {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-tab-button:hover {
+  color: #374151;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-tab-button.drivemego-b2b-partnerassignedvehiclespage-active {
+  color: #12b0c4;
+  border-bottom-color: #12b0c4;
+}
+
+.b2b-assigned-vehicles-content,
+.b2b-routes-content {
+  padding: 20px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicles-grid,
+.drivemego-b2b-partnerassignedvehiclespage-routes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicle-card,
+.drivemego-b2b-partnerassignedvehiclespage-route-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  transition: box-shadow 0.2s;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicle-card:hover,
+.drivemego-b2b-partnerassignedvehiclespage-route-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Route Card Specific Styles */
+.drivemego-b2b-partnerassignedvehiclespage-route-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicle-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicle-card-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicle-category {
+  padding: 4px 10px;
+  background: #e5e7eb;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-vehicle-reg {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 16px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-assignment-section {
+  padding: 12px 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-assignment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-assignment-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-status-badge.drivemego-b2b-partnerassignedvehiclespage-assigned {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-status-badge.drivemego-b2b-partnerassignedvehiclespage-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-status-badge.drivemego-b2b-partnerassignedvehiclespage-active,
+.drivemego-b2b-partnerassignedvehiclespage-status-badge.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-assignment-details {
+  margin-bottom: 8px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-assignment-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-assigned-by {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-no-assignment {
+  font-size: 14px;
+  color: #9ca3af;
+  font-style: italic;
+  margin: 0 0 8px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-update-btn {
+  padding: 8px 16px;
+  background: #12b0c4;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-update-btn:hover {
+  background: #138d7b;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-section {
+  padding: 16px 0 0 0;
+  margin-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-header {
+  margin-bottom: 12px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-details {
+  background: #f0fdf4;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+  margin-bottom: 10px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-details:last-child {
+  margin-bottom: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-path {
+  font-size: 15px;
+  font-weight: 600;
+  color: #166534;
+  margin: 0 0 10px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-info {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Route Card */
+.drivemego-b2b-partnerassignedvehiclespage-route-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-card-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-info-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-info-row .drivemego-b2b-partnerassignedvehiclespage-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-info-row .drivemego-b2b-partnerassignedvehiclespage-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-days {
+  margin-top: 8px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-route-days .drivemego-b2b-partnerassignedvehiclespage-label {
+  font-size: 12px;
+  color: #6b7280;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-days-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-day-badge {
+  padding: 3px 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Empty State */
+.drivemego-b2b-partnerassignedvehiclespage-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px dashed #e5e7eb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-empty-state p {
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Loading/Error States */
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-error {
+  text-align: center;
+  padding: 60px 20px;
+  max-width: 400px;
+  margin: 60px auto;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-error .drivemego-b2b-partnerassignedvehiclespage-error-icon {
+  width: 64px;
+  height: 64px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 auto 20px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-error h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-error p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 20px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-error button {
+  padding: 12px 24px;
+  background: #12b0c4;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Modal Styles */
+.drivemego-b2b-partnerassignedvehiclespage-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-close:hover {
+  background: #e5e7eb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-body {
+  padding: 20px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-info {
+  font-size: 14px;
+  color: #374151;
+  margin: 0 0 8px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-warning {
+  font-size: 13px;
+  color: #f59e0b;
+  background: #fef3c7;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin: 0 0 16px 0;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-form-group {
+  margin-top: 16px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-form-group select:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.1);
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-cancel-btn {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-cancel-btn:hover {
+  background: #f9fafb;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-submit-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: #12b0c4;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-submit-btn:hover {
+  background: #138d7b;
+}
+
+.drivemego-b2b-partnerassignedvehiclespage-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-container {
+    padding: 16px;
+  }
+
+  .drivemego-b2b-partnerassignedvehiclespage-vehicles-grid,
+  .drivemego-b2b-partnerassignedvehiclespage-routes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-b2b-partnerassignedvehiclespage-b2b-assigned-vehicles-header h1 {
+    font-size: 22px;
+  }
+}

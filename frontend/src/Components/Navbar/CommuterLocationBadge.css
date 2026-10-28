@@ -1,0 +1,107 @@
+/* =====================================================================
+   DriveMeGo — Commuter Location Badge (Navbar)
+   Brand palette: navy ink + teal pin/accent. Amber tint for "unavailable".
+   ===================================================================== */
+
+.clb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.65rem;
+    background: #ffffff;
+    border: 1px solid #e4ecf3;
+    border-radius: 0.75rem;
+    color: #0a2a43;
+    font-family: inherit;
+    cursor: default;
+}
+
+.clb-badge.clb-unavailable {
+    border-color: #fcdca0;
+    background: #fff8e6;
+}
+
+.clb-pin {
+    display: inline-flex;
+    color: #12b0c4;
+    flex-shrink: 0;
+}
+
+.clb-unavailable .clb-pin {
+    color: #d98a10;
+}
+
+.clb-current {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.1;
+    min-width: 0;
+}
+
+.clb-country {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #0a2a43;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 9rem;
+}
+
+.clb-meta {
+    font-size: 0.625rem;
+    color: #8598a8;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.clb-unavailable .clb-meta {
+    color: #b0740c;
+}
+
+.clb-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.5rem;
+    color: #8598a8;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+    flex-shrink: 0;
+}
+
+.clb-refresh:hover:not(:disabled) {
+    color: #0e97a8;
+    background: #e6f7fa;
+}
+
+.clb-refresh:focus-visible {
+    outline: none;
+    color: #0e97a8;
+    box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.18);
+}
+
+.clb-refresh:disabled {
+    cursor: wait;
+}
+
+.clb-refreshing svg {
+    animation: clb-spin 0.8s linear infinite;
+}
+
+@keyframes clb-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Compact on small screens */
+@media (max-width: 640px) {
+    .clb-meta {
+        display: none;
+    }
+}

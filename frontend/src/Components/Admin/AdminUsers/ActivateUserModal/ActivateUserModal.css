@@ -1,0 +1,311 @@
+/* Activate User Modal — DriveMeGo brand (semantic green kept for activation) */
+.activate-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 42, 67, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.activate-modal {
+  background: white;
+  border-radius: 20px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 70px rgba(10, 42, 67, 0.35);
+}
+
+.activate-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 26px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-radius: 20px 20px 0 0;
+}
+
+.activate-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: white;
+  font-weight: 700;
+}
+
+.activate-modal-header .close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: background 0.2s;
+}
+
+.activate-modal-header .close-btn:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.activate-modal-body {
+  padding: 26px;
+}
+
+.activate-modal .user-info-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f5fafc;
+  border: 1px solid #e4ecf3;
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+
+.activate-modal .user-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.activate-modal .user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.activate-modal .avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #0a2a43 0%, #12b0c4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.activate-modal .user-details h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: #0a2a43;
+  font-weight: 700;
+}
+
+.activate-modal .user-details p {
+  margin: 0 0 8px 0;
+  color: #5b6b7b;
+  font-size: 0.875rem;
+}
+
+.activate-modal .status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.activate-modal .status-badge.suspended {
+  background: #fef2f2;
+  color: #dc3545;
+}
+
+.activate-modal .status-badge.pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.suspension-info {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.suspension-info h4 {
+  margin: 0 0 12px 0;
+  color: #991b1b;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.suspension-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #fecaca;
+}
+
+.suspension-info .info-row:last-child {
+  border-bottom: none;
+}
+
+.suspension-info .label {
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.suspension-info .value {
+  color: #7f1d1d;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.activate-modal .form-section {
+  margin-bottom: 20px;
+}
+
+.activate-modal .section-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f2233;
+  margin-bottom: 4px;
+}
+
+.activate-modal .section-desc {
+  color: #5b6b7b;
+  font-size: 0.8rem;
+  margin: 0 0 12px 0;
+}
+
+.message-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d7e0ea;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.message-textarea:focus {
+  outline: none;
+  border-color: #22c55e;
+}
+
+.hint-text {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  margin: 8px 0 0 0;
+  font-style: italic;
+}
+
+.activation-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+
+.activation-preview svg {
+  color: #22c55e;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.activation-preview div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activation-preview strong {
+  color: #166534;
+  font-size: 0.875rem;
+}
+
+.activation-preview ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #15803d;
+  font-size: 0.8rem;
+}
+
+.activation-preview li {
+  margin: 4px 0;
+}
+
+.activate-modal .modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid #e4ecf3;
+}
+
+.activate-modal .cancel-btn {
+  padding: 12px 24px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.activate-modal .cancel-btn:hover {
+  background: #e5e7eb;
+}
+
+.activate-modal .confirm-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: none;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+  font-family: inherit;
+}
+
+.activate-modal .confirm-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.activate-modal .confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .activate-modal {
+    max-width: 100%;
+    margin: 10px;
+  }
+
+  .activate-modal .modal-actions {
+    flex-direction: column;
+  }
+
+  .activate-modal .modal-actions button {
+    width: 100%;
+  }
+}

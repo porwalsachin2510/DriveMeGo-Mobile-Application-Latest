@@ -1,0 +1,354 @@
+/* Admin User Details Modal — DriveMeGo brand (navy + teal) */
+.admin-user-details-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 42, 67, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.admin-user-details-modal {
+  background: #ffffff;
+  border-radius: 20px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 70px rgba(10, 42, 67, 0.35);
+}
+
+.admin-user-details-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 26px;
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(18, 176, 196, 0.32) 0%, rgba(18, 176, 196, 0) 60%),
+    linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  border-radius: 20px 20px 0 0;
+}
+
+.admin-user-details-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.admin-user-details-modal-subtitle {
+  font-size: 14px;
+  color: rgba(226, 240, 248, 0.82);
+  margin: 0;
+}
+
+.admin-user-details-modal-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 10px;
+  color: #ffffff;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.admin-user-details-modal-close svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+.admin-user-details-modal-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.admin-user-details-modal-body {
+  padding: 26px;
+}
+
+.admin-user-details-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.admin-user-details-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-user-details-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b6b7b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-user-details-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0a2a43;
+}
+
+.admin-user-details-status {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.admin-user-details-status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.admin-user-details-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.admin-user-details-section {
+  background: #f5fafc;
+  border: 1px solid #e4ecf3;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.admin-user-details-section:last-child {
+  margin-bottom: 0;
+}
+
+.admin-user-details-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0a2a43;
+  margin: 0 0 16px 0;
+}
+
+.admin-user-details-section-title svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+  color: #0e97a8;
+}
+
+.admin-user-details-route {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.admin-user-details-route-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-user-details-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 26px;
+  border-top: 1px solid #e4ecf3;
+}
+
+.admin-user-details-btn {
+  padding: 11px 22px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-family: inherit;
+}
+
+.admin-user-details-btn-secondary {
+  background: #f1f5f9;
+  color: #374151;
+  border: 1px solid #e4ecf3;
+}
+
+.admin-user-details-btn-secondary:hover {
+  background: #e9eff5;
+}
+
+.admin-user-details-btn-primary {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(34, 197, 94, 0.26);
+}
+
+.admin-user-details-btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.admin-user-details-btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.26);
+}
+
+.admin-user-details-btn-danger:hover {
+  transform: translateY(-1px);
+}
+
+.admin-user-details-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* KYC verification */
+.admin-kyc-badge {
+  margin-left: auto;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.admin-kyc-badge-verified {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.admin-kyc-badge-pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.admin-kyc-badge-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-kyc-document {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-kyc-image-btn {
+  border: 1px solid #e4ecf3;
+  border-radius: 12px;
+  padding: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  transition: border-color 0.2s;
+}
+
+.admin-kyc-image-btn:hover {
+  border-color: #12b0c4;
+}
+
+.admin-kyc-image-thumb {
+  max-width: 240px;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.admin-kyc-image-hint {
+  font-size: 12px;
+  color: #5b6b7b;
+}
+
+.admin-kyc-no-image {
+  font-size: 13px;
+  color: #b91c1c;
+  margin: 0;
+}
+
+.admin-kyc-reject-form {
+  padding: 16px 26px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-kyc-reject-textarea {
+  width: 100%;
+  border: 1px solid #e4ecf3;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.admin-kyc-reject-textarea:focus {
+  outline: none;
+  border-color: #ef4444;
+}
+
+.admin-kyc-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 42, 67, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 24px;
+  cursor: zoom-out;
+}
+
+.admin-kyc-lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+  .admin-user-details-modal {
+    max-height: 95vh;
+  }
+
+  .admin-user-details-modal-header {
+    padding: 20px;
+  }
+
+  .admin-user-details-modal-body {
+    padding: 20px;
+  }
+
+  .admin-user-details-info-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .admin-user-details-route {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-details-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .admin-user-details-btn {
+    width: 100%;
+  }
+}

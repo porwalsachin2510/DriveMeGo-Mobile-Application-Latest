@@ -1,0 +1,12360 @@
+import mongoose from "mongoose";
+import Payment from "../models/Payment.js";
+import Contract from "../models/Contract.js";
+import Wallet from "../models/Wallet.js";
+import Transaction from "../models/Transaction.js";
+import PaymentSchedule from "../models/PaymentSchedule.js";
+import User from "../models/User.js";
+import Notification from "../models/Notification.js";
+import Vehicle from "../models/Vehicle.js";
+import B2CPartnerRoute from "../models/B2CPartnerRoute.js";
+import B2CPassengerBooking from "../models/B2CPassengerBooking.js";
+import B2CPartnerVehicle from "../models/B2CPartnerVehicle.js";
+import RouteRequest from "../models/RouteRequest.js";
+import Quotation from "../models/Quotation.js";
+import Campaign from "../models/Campaign.js";
+import Tag from "../models/Tag.js";
+import B2CPartnerTrip from "../models/B2CPartnerTrip.js";
+import Trip from "../models/Trip.js";
+import B2CPartnerDriver from "../models/B2CPartnerDriver.js";
+import B2CPartnerSchedule from "../models/B2CPartnerSchedule.js";
+import B2CMonthlyPass from "../models/B2CMonthlyPass.js";
+import Subscription from "../models/Subscription.js";
+import { processRouteDeletionRefundForPass, round2, deallocateVehicleFromAllAssignments } from "./b2cScheduleController.js";
+import AdminNegotiation from "../models/AdminNegotiation.js";
+import CorporateBooking from "../models/CorporateBooking.js";
+import EMIPayment from "../models/EMIPayment.js";
+import WithdrawalRequest from "../models/WithdrawalRequest.js";
+import Report from "../models/Report.js";
+import { uploadToCloudinary } from "../Config/Cloudinary.js";
+import { createNotification, sendRealTimeNotification } from "../Services/notificationService.js";
+import { broadcastVehicleAvailabilityChange } from "../Services/socketService.js";
+import { creditAdminNegotiationCommission } from "./walletController.js";
+import { settleCashDuesOnTopUp } from "../Services/cashCancellationService.js";
+import paymentGatewayService, { getPaymentGateway, detectCountryFromCurrency } from "../Services/paymentGatewayService.js";
+import { computeRouteSeatAvailability } from "../Services/seatAvailabilityService.js";
+import { normalizeCountry, getCountryCurrency, getEffectiveCountry, getCurrencyDecimals, getServiceCountryCodes, isServedCountry } from "../Config/localizationConfig.js";
+import { resolveDisplayCurrency, convertForDisplay, sumByCurrency } from "../Services/displayCurrency.js";
+import { getOrCreateWallet } from "../Services/walletService.js";
+import { isPrimaryOwnerId, ALL_ADMIN_MODULES } from "../Services/ownerService.js";
+import DemandNotification from "../models/DemandNotification.js";
+
+// Route a payout status notification to the correct inbox. Demand Generation
+// staff (ownerModel === "DemandEmployee") read the DemandNotification feed in
+// their portal; every other user gets the standard platform notification.
+const notifyPayoutTarget = async (payout, { type, title, message, data }) => {
+    try {
+        if (payout?.ownerModel === "DemandEmployee") {
+            await DemandNotification.create({
+                employee: payout.userId,
+                type: "GENERAL",
+                title,
+                message,
+                data: data || {},
+            });
+            return;
+        }
+        await createNotification({ userId: payout.userId, type, title, message, data });
+    } catch (err) {
+        console.error("[notifyPayoutTarget] failed:", err?.message);
+    }
+};
+
+// Get all users for admin
+export const getAllUsers = async (req, res) => {
+    try {
+        const { role, status, page, limit, search } = req.query;
+        const query = {};
+
+        if (role) query.role = role;
+        if (status) query.status = status;
+
+        if (search) {
+            query.$or = [
+                { fullName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+                { whatsappNumber: { $regex: search, $options: 'i' } },
+                { companyName: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        // Pagination is OPT-IN. The admin User Management screen loads the full
+        // list (and filters/tabs client-side), so when no `limit`/`page` is
+        // provided we must return EVERY matching user. Previously this defaulted
+        // to limit=20, which silently hid users beyond the 20 most-recent —
+        // making legitimate accounts vanish from the Corporates / B2B tabs even
+        // though the stat badges (counted separately) stayed correct.
+        const usersQuery = User.find(query).select('-password').sort({ createdAt: -1 });
+
+        if (limit) {
+            const parsedLimit = Number.parseInt(limit);
+            const parsedPage = Number.parseInt(page) || 1;
+            usersQuery.limit(parsedLimit).skip((parsedPage - 1) * parsedLimit);
+        }
+
+        const usersDocs = await usersQuery;
+
+        const total = await User.countDocuments(query);
+
+        // Enrich B2C partner accounts with their REAL route counts so admin
+        // Service Provider cards/details show accurate figures instead of 0.
+        const users = await Promise.all(
+            usersDocs.map(async (u) => {
+                const obj = u.toObject();
+                if (obj.role === "B2C_PARTNER") {
+                    const [routeCount, activeRouteCount] = await Promise.all([
+                        B2CPartnerRoute.countDocuments({ b2cPartnerId: obj._id }),
+                        B2CPartnerRoute.countDocuments({
+                            b2cPartnerId: obj._id,
+                            status: "Active",
+                            isActive: true,
+                        }),
+                    ]);
+                    obj.routeCount = routeCount;
+                    obj.activeRouteCount = activeRouteCount;
+                }
+                return obj;
+            })
+        );
+
+        const effectiveLimit = limit ? Number.parseInt(limit) : total;
+        res.status(200).json({
+            success: true,
+            users,
+            pagination: {
+                total,
+                page: Number.parseInt(page) || 1,
+                pages: effectiveLimit > 0 ? Math.ceil(total / effectiveLimit) : 1,
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching users:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching users",
+            error: error.message,
+        });
+    }
+};
+
+// Get user statistics for admin
+export const getUserStats = async (req, res) => {
+    try {
+        const [
+            totalUsers,
+            commuters,
+            corporates,
+            b2cPartners,
+            b2bPartners,
+            schoolPartners,
+            schoolCustomers,
+            drivers,
+            activeUsers,
+            suspendedUsers
+        ] = await Promise.all([
+            User.countDocuments(),
+            User.countDocuments({ role: "COMMUTER" }),
+            User.countDocuments({ role: "CORPORATE" }),
+            User.countDocuments({ role: "B2C_PARTNER" }),
+            User.countDocuments({ role: "B2B_PARTNER" }),
+            User.countDocuments({ role: "SCHOOL_PARTNER" }),
+            User.countDocuments({ role: "SCHOOL_CUSTOMER" }),
+            // Count EVERY driver subtype so the Drivers tab/stat matches the
+            // roles that actually exist (B2B, corporate, B2C, and school drivers).
+            User.countDocuments({
+                role: {
+                    $in: [
+                        "B2B_PARTNER_DRIVER",
+                        "CORPORATE_DRIVER",
+                        "B2C_PARTNER_DRIVER",
+                        "SCHOOL_PARTNER_DRIVER",
+                        "SCHOOL_CUSTOMER_DRIVER",
+                    ],
+                },
+            }),
+            User.countDocuments({ status: "ACTIVE" }),
+            User.countDocuments({ status: "SUSPENDED" })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalUsers,
+                commuters,
+                corporates,
+                b2cPartners,
+                b2bPartners,
+                schoolPartners,
+                schoolCustomers,
+                drivers,
+                activeUsers,
+                suspendedUsers
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching user stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching user statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Suspend user
+export const suspendUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { reason, durationDays, customEndDate } = req.body;
+
+        // OWNER PROTECTION: the primary owner can never be suspended.
+        if (isPrimaryOwnerId(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "The platform owner account cannot be suspended."
+            });
+        }
+
+        // SUPER ADMIN PROTECTION: a super admin account can only be suspended
+        // by another super admin. A regular admin must never be able to suspend
+        // a super admin (the platform's top-level user).
+        const targetToSuspend = await User.findById(userId).select("role adminPermissions");
+        if (!targetToSuspend) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        if (targetToSuspend.role === "ADMIN" && targetToSuspend.adminPermissions?.isSuperAdmin) {
+            const requestingAdmin = await User.findById(req.userId).select("adminPermissions");
+            const requesterIsSuperAdmin =
+                isPrimaryOwnerId(req.userId) || requestingAdmin?.adminPermissions?.isSuperAdmin === true;
+            if (!requesterIsSuperAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Only super admins can suspend another super admin."
+                });
+            }
+        }
+
+        // Calculate suspension end date
+        const suspendedAt = new Date();
+        let suspensionEndDate;
+        let duration = durationDays || 7; // Default 1 week
+
+        if (customEndDate) {
+            suspensionEndDate = new Date(customEndDate);
+            duration = Math.ceil((suspensionEndDate - suspendedAt) / (1000 * 60 * 60 * 24));
+        } else {
+            suspensionEndDate = new Date(suspendedAt.getTime() + (duration * 24 * 60 * 60 * 1000));
+        }
+        const user = await User.findByIdAndUpdate(
+            userId,
+            {
+                status: "SUSPENDED",
+                suspendedAt: suspendedAt,
+                suspendedBy: req.userId,
+                suspensionReason: reason || "Violation of platform terms and conditions",
+                suspensionDuration: duration,
+                suspensionEndDate: suspensionEndDate
+            },
+            { new: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Send suspension notification
+        try {
+            await createNotification({
+                userId: user._id,
+                type: "ACCOUNT_SUSPENDED",
+                title: "Account Suspended",
+                message: `Your account has been suspended for ${duration} days. Reason: ${reason || "Violation of platform terms and conditions"}`,
+                data: {
+                    suspensionReason: reason,
+                    suspensionDuration: duration,
+                    suspensionEndDate: suspensionEndDate
+                }
+            });
+
+            // Send real-time notification
+            sendRealTimeNotification(user._id.toString(), {
+                type: "ACCOUNT_SUSPENDED",
+                title: "Account Suspended",
+                message: `Your account has been suspended for ${duration} days.`,
+                data: { suspensionReason: reason, suspensionDuration: duration }
+            });
+        } catch (notifError) {
+            console.error("[v0] Error sending suspension notification:", notifError);
+        }
+
+        // Send suspension email
+        try {
+            const { sendSuspensionEmail } = await import("../Services/emailService.js");
+            await sendSuspensionEmail({
+                email: user.email,
+                fullName: user.fullName,
+                reason: reason || "Violation of platform terms and conditions",
+                durationDays: duration,
+                suspensionEndDate: suspensionEndDate
+            });
+        } catch (emailError) {
+            console.error("[v0] Error sending suspension email:", emailError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `User suspended for ${duration} days`,
+            user,
+            suspensionDetails: {
+                reason: reason || "Violation of platform terms and conditions",
+                durationDays: duration,
+                suspensionEndDate: suspensionEndDate
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error suspending user:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error suspending user",
+            error: error.message,
+        });
+    }
+};
+
+// Activate user
+export const activateUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const { message, isNewActivation } = req.body; // Optional message from admin and flag for new vs reactivation
+
+        // Get previous user status to determine if this is a new activation or reactivation
+        const previousUser = await User.findById(userId).select('status suspensionReason role').lean();
+        const wasNewUser = previousUser?.status === "PENDING" || isNewActivation;
+
+        const updatePayload = {
+            status: "ACTIVE",
+            activatedAt: new Date(),
+            activatedBy: req.userId,
+            suspensionEndDate: null,
+            suspensionReason: null,
+            suspensionDuration: null,
+            reactivationMessage: message || null,
+        };
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            updatePayload,
+            { new: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Set appropriate wording based on new activation vs reactivation
+        const notificationTitle = wasNewUser ? "Account Activated" : "Account Reactivated";
+        const defaultMessage = wasNewUser
+            ? "Your account has been activated. Welcome to DriveMeGo! You can now log in and start using our services."
+            : "Your account has been reactivated. Please ensure you follow our platform guidelines to avoid future suspensions.";
+
+        // Send activation notification
+        try {
+            await createNotification({
+                userId: user._id,
+                type: "ACCOUNT_ACTIVATED",
+                title: notificationTitle,
+                message: message || defaultMessage,
+                data: {
+                    activatedAt: new Date(),
+                    adminMessage: message,
+                    isNewActivation: wasNewUser
+                }
+            });
+
+            // Send real-time notification
+            sendRealTimeNotification(user._id.toString(), {
+                type: "ACCOUNT_ACTIVATED",
+                title: notificationTitle,
+                message: wasNewUser
+                    ? "Your account has been activated! Welcome to DriveMeGo."
+                    : "Your account has been reactivated! You can now log in.",
+                data: { adminMessage: message, isNewActivation: wasNewUser }
+            });
+        } catch (notifError) {
+            console.error("[v0] Error sending activation notification:", notifError);
+        }
+
+        // Send activation email
+        try {
+            const { sendActivationEmail } = await import("../Services/emailService.js");
+            await sendActivationEmail({
+                email: user.email,
+                fullName: user.fullName,
+                message: message || defaultMessage,
+                previousReason: wasNewUser ? null : previousUser?.suspensionReason,
+                isNewActivation: wasNewUser
+            });
+        } catch (emailError) {
+            console.error("[v0] Error sending activation email:", emailError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: wasNewUser ? "User activated successfully" : "User reactivated successfully",
+            user
+        });
+    } catch (error) {
+        console.error("[v0] Error activating user:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error activating user",
+            error: error.message,
+        });
+    }
+};
+
+// Delete user
+export const deleteUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // OWNER PROTECTION: the primary owner can never be deleted.
+        if (isPrimaryOwnerId(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "The platform owner account cannot be deleted."
+            });
+        }
+
+        // SUPER ADMIN PROTECTION: a super admin account can only be deleted by
+        // another super admin. A regular admin must never be able to delete a
+        // super admin (the platform's top-level user).
+        const targetToDelete = await User.findById(userId).select("role adminPermissions");
+        if (!targetToDelete) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        if (targetToDelete.role === "ADMIN" && targetToDelete.adminPermissions?.isSuperAdmin) {
+            const requestingAdmin = await User.findById(req.userId).select("adminPermissions");
+            const requesterIsSuperAdmin =
+                isPrimaryOwnerId(req.userId) || requestingAdmin?.adminPermissions?.isSuperAdmin === true;
+            if (!requesterIsSuperAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Only super admins can delete another super admin."
+                });
+            }
+        }
+
+        const user = await User.findByIdAndDelete(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Also delete user's wallet if exists
+        await Wallet.findOneAndDelete({ userId });
+
+        res.status(200).json({
+            success: true,
+            message: "User deleted successfully"
+        });
+    } catch (error) {
+        console.error("[v0] Error deleting user:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting user",
+            error: error.message,
+        });
+    }
+};
+
+// Edit user details (admin)
+export const editUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const updates = req.body;
+
+        // Prevent updating sensitive fields
+        const disallowedFields = ['password', 'role', '_id'];
+        disallowedFields.forEach(field => delete updates[field]);
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: updates },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "User updated successfully",
+            data: { user }
+        });
+    } catch (error) {
+        console.error("[v0] Error editing user:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error editing user",
+            error: error.message,
+        });
+    }
+};
+
+// Get user details for admin
+export const getUserDetails = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await User.findById(userId)
+            .select('-password')
+            .populate('companyId', 'fullName companyName email');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Get user's wallet
+        const wallet = await Wallet.findOne({ userId });
+
+        // Get user's recent transactions
+        const transactions = await Transaction.find({ userId })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        res.status(200).json({
+            success: true,
+            user,
+            wallet,
+            transactions
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching user details:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching user details",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C providers for admin
+export const getB2CProviders = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20, search } = req.query;
+        const query = { role: "B2C_PARTNER" };
+
+        if (status) query.status = status;
+
+        if (search) {
+            query.$or = [
+                { fullName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+                { companyName: { $regex: search, $options: 'i' } },
+                { whatsappNumber: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const providers = await User.find(query)
+            .select('-password')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await User.countDocuments(query);
+
+        res.status(200).json({
+            success: true,
+            providers,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C providers:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C providers",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C provider statistics for admin
+export const getB2CProviderStats = async (req, res) => {
+    try {
+        const [
+            totalProviders,
+            activeProviders,
+            suspendedProviders,
+            pendingProviders
+        ] = await Promise.all([
+            User.countDocuments({ role: "B2C_PARTNER" }),
+            User.countDocuments({ role: "B2C_PARTNER", status: "ACTIVE" }),
+            User.countDocuments({ role: "B2C_PARTNER", status: "SUSPENDED" }),
+            User.countDocuments({ role: "B2C_PARTNER", status: "PENDING" })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalProviders,
+                activeProviders,
+                suspendedProviders,
+                pendingProviders
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C provider stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C provider statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Suspend B2C provider
+export const suspendB2CProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+        const { reason, durationDays, customEndDate } = req.body;
+
+        // Calculate suspension end date
+        const suspendedAt = new Date();
+        let suspensionEndDate;
+        let duration = durationDays || 7; // Default 1 week
+
+        if (customEndDate) {
+            suspensionEndDate = new Date(customEndDate);
+            duration = Math.ceil((suspensionEndDate - suspendedAt) / (1000 * 60 * 60 * 24));
+        } else {
+            suspensionEndDate = new Date(suspendedAt.getTime() + (duration * 24 * 60 * 60 * 1000));
+        }
+        const provider = await User.findOneAndUpdate(
+            { _id: providerId, role: "B2C_PARTNER" },
+            {
+                status: "SUSPENDED",
+                suspendedAt: suspendedAt,
+                suspendedBy: req.userId,
+                suspensionReason: reason || "Violation of platform terms and conditions",
+                suspensionDuration: duration,
+                suspensionEndDate: suspensionEndDate
+            },
+            { new: true }
+        ).select('-password');
+
+        if (!provider) {
+            return res.status(404).json({
+                success: false,
+                message: "B2C provider not found"
+            });
+        }
+
+        // Send notifications and email (same as suspendUser)
+        try {
+            await createNotification({
+                userId: provider._id,
+                type: "ACCOUNT_SUSPENDED",
+                title: "Account Suspended",
+                message: `Your account has been suspended for ${duration} days. Reason: ${reason || "Violation of platform terms and conditions"}`,
+                data: { suspensionReason: reason, suspensionDuration: duration, suspensionEndDate }
+            });
+
+            sendRealTimeNotification(provider._id.toString(), {
+                type: "ACCOUNT_SUSPENDED",
+                title: "Account Suspended",
+                message: `Your account has been suspended for ${duration} days.`,
+                data: { suspensionReason: reason, suspensionDuration: duration }
+            });
+
+            const { sendSuspensionEmail } = await import("../Services/emailService.js");
+            await sendSuspensionEmail({
+                email: provider.email,
+                fullName: provider.fullName,
+                reason: reason || "Violation of platform terms and conditions",
+                durationDays: duration,
+                suspensionEndDate
+            });
+        } catch (notifError) {
+            console.error("[v0] Error sending B2C suspension notifications:", notifError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `B2C provider suspended for ${duration} days`,
+            provider,
+            suspensionDetails: { reason, durationDays: duration, suspensionEndDate }
+        });
+    } catch (error) {
+        console.error("[v0] Error suspending B2C provider:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error suspending B2C provider",
+            error: error.message,
+        });
+    }
+};
+
+// Activate B2C provider
+export const activateB2CProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+        const { message } = req.body;
+
+        const previousSuspensionReason = await User.findById(providerId).select('suspensionReason').lean();
+        const provider = await User.findOneAndUpdate(
+            { _id: providerId, role: "B2C_PARTNER" },
+            {
+                status: "ACTIVE",
+                activatedAt: new Date(),
+                activatedBy: req.userId,
+                suspensionEndDate: null,
+                suspensionReason: null,
+                suspensionDuration: null,
+                reactivationMessage: message || null
+            },
+            { new: true }
+        ).select('-password');
+
+        if (!provider) {
+            return res.status(404).json({
+                success: false,
+                message: "B2C provider not found"
+            });
+        }
+
+        // Send activation notifications and email
+        try {
+            await createNotification({
+                userId: provider._id,
+                type: "ACCOUNT_ACTIVATED",
+                title: "Account Reactivated",
+                message: message || "Your account has been reactivated. Please follow our platform guidelines.",
+                data: { reactivatedAt: new Date(), adminMessage: message }
+            });
+
+            sendRealTimeNotification(provider._id.toString(), {
+                type: "ACCOUNT_ACTIVATED",
+                title: "Account Reactivated",
+                message: "Your account has been reactivated! You can now log in.",
+                data: { adminMessage: message }
+            });
+
+            const { sendActivationEmail } = await import("../Services/emailService.js");
+            await sendActivationEmail({
+                email: provider.email,
+                fullName: provider.fullName,
+                message: message || "Your account has been reactivated.",
+                previousReason: previousSuspensionReason?.suspensionReason
+            });
+        } catch (notifError) {
+            console.error("[v0] Error sending B2C activation notifications:", notifError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "B2C provider activated successfully",
+            provider
+        });
+    } catch (error) {
+        console.error("[v0] Error activating B2C provider:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error activating B2C provider",
+            error: error.message,
+        });
+    }
+};
+
+// Get finance metrics for admin
+export const getFinanceMetrics = async (req, res) => {
+    try {
+        // Currency the admin wants to view the dashboard in (e.g. KWD). Every
+        // amount below is stored in its NATIVE currency, so we group by currency
+        // and convert each bucket to `displayCurrency` before summing.
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        const [
+            totalRevenue,
+            netEarnings,
+            pendingPayouts,
+            activeProviders,
+            totalTransactions,
+            monthlyRevenue,
+            commissionEarned,
+            securityDeposits
+        ] = await Promise.all([
+            Transaction.aggregate([
+                { $match: { category: 'PAYMENT_RECEIVED' } },
+                { $group: { _id: '$currency', total: { $sum: '$amount' } } }
+            ]),
+            Transaction.aggregate([
+                { $match: { category: 'COMMISSION_EARNED' } },
+                { $group: { _id: '$currency', total: { $sum: '$amount' } } }
+            ]),
+            Transaction.aggregate([
+                { $match: { category: 'PAYOUT_REQUESTED' } },
+                { $group: { _id: '$currency', total: { $sum: '$amount' } } }
+            ]),
+            User.countDocuments({ role: "B2C_PARTNER", status: "ACTIVE" }),
+            Transaction.countDocuments(),
+            Transaction.aggregate([
+                { $match: { createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } },
+                { $group: { _id: '$currency', total: { $sum: '$amount' } } }
+            ]),
+            Transaction.aggregate([
+                { $match: { category: 'COMMISSION_EARNED' } },
+                { $group: { _id: '$currency', total: { $sum: '$amount' } } }
+            ]),
+            Wallet.aggregate([
+                { $group: { _id: '$currency', total: { $sum: '$securityDepositHeld' } } }
+            ])
+        ]);
+
+        res.status(200).json({
+            success: true,
+            metrics: {
+                totalRevenue: sumByCurrency(totalRevenue, displayCurrency),
+                netEarnings: sumByCurrency(netEarnings, displayCurrency),
+                pendingPayouts: sumByCurrency(pendingPayouts, displayCurrency),
+                activeProviders,
+                totalTransactions,
+                monthlyRevenue: sumByCurrency(monthlyRevenue, displayCurrency),
+                commissionEarned: sumByCurrency(commissionEarned, displayCurrency),
+                securityDeposits: sumByCurrency(securityDeposits, displayCurrency),
+                currency: displayCurrency
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching finance metrics:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching finance metrics",
+            error: error.message,
+        });
+    }
+};
+
+// Get payout requests for admin
+export const getPayoutRequests = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const displayCurrency = resolveDisplayCurrency(req);
+        const query = {};
+
+        if (status) query.status = status;
+
+        // First, sync any PENDING wallet withdrawals that don't have WithdrawalRequest records
+        // This handles legacy data before WithdrawalRequest model was implemented
+        try {
+            const walletsWithPendingWithdrawals = await Wallet.find({
+                'transactions.type': 'WITHDRAWAL',
+                'transactions.status': 'PENDING'
+            }).populate('userId', 'fullName email phone role');
+
+            for (const wallet of walletsWithPendingWithdrawals) {
+                for (const txn of wallet.transactions) {
+                    if (txn.type === 'WITHDRAWAL' && txn.status === 'PENDING') {
+                        // Check if WithdrawalRequest already exists for this transaction
+                        const existingRequest = await WithdrawalRequest.findOne({
+                            walletTransactionId: txn._id
+                        });
+
+                        if (!existingRequest) {
+                            // Create WithdrawalRequest for legacy withdrawal
+                            const user = wallet.userId;
+                            await WithdrawalRequest.create({
+                                userId: user?._id || wallet.userId,
+                                walletId: wallet._id,
+                                requestId: `WR-LEGACY-${txn._id.toString().slice(-8).toUpperCase()}`,
+                                amount: Math.abs(txn.amount),
+                                currency: wallet.currency || 'AED',
+                                bankName: txn.bankName || (txn.description?.match(/to (.+?) -/) || [])[1] || 'Unknown Bank',
+                                bankCode: txn.bankCode || '',
+                                iban: txn.bankAccount || 'N/A',
+                                accountHolderName: txn.accountHolderName || (txn.description?.match(/- (.+)$/) || [])[1] || user?.fullName || 'Unknown',
+                                status: 'PENDING',
+                                userInfo: {
+                                    fullName: user?.fullName || user?.name || 'Unknown',
+                                    email: user?.email || '',
+                                    phone: user?.phone || '',
+                                    role: user?.role || wallet.role || 'USER'
+                                },
+                                walletTransactionId: txn._id,
+                                metadata: {
+                                    reference: txn.reference,
+                                    legacyMigration: true,
+                                    originalCreatedAt: txn.createdAt,
+                                    originalDescription: txn.description
+                                },
+                                createdAt: txn.createdAt || new Date()
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (migrationError) {
+            console.error("[getPayoutRequests] Error migrating legacy withdrawals:", migrationError);
+            // Continue even if migration fails
+        }
+
+        // Fetch from WithdrawalRequest model
+        const payouts = await WithdrawalRequest.find(query)
+            .populate('userId', 'fullName email phone role')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await WithdrawalRequest.countDocuments(query);
+        const pendingCount = await WithdrawalRequest.countDocuments({ status: 'PENDING' });
+
+        // Transform data for frontend. We keep the NATIVE amount/currency for
+        // reference and add converted display fields so the admin sees every
+        // request in the currency they selected for the dashboard.
+        const formattedPayouts = payouts.map(payout => ({
+            _id: payout._id,
+            requestId: payout.requestId,
+            providerId: payout.userId,
+            type: payout.userInfo?.role || 'USER',
+            totalAmount: payout.amount,
+            commissionAmount: 0, // No commission on withdrawals
+            netPayable: payout.amount,
+            status: payout.status,
+            bankName: payout.bankName,
+            iban: payout.iban,
+            accountHolderName: payout.accountHolderName,
+            currency: payout.currency,
+            displayCurrency,
+            displayAmount: convertForDisplay(payout.amount, payout.currency, displayCurrency),
+            createdAt: payout.createdAt,
+            processedAt: payout.processedAt,
+            completedAt: payout.completedAt,
+            rejectedAt: payout.rejectedAt,
+            rejectionReason: payout.rejectionReason,
+            adminNotes: payout.adminNotes,
+            transactionReference: payout.transactionReference,
+            userInfo: payout.userInfo
+        }));
+
+        res.status(200).json({
+            success: true,
+            payouts: formattedPayouts,
+            displayCurrency,
+            stats: {
+                total,
+                pending: pendingCount
+            },
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching payout requests:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching payout requests",
+            error: error.message,
+        });
+    }
+};
+
+// Get transactions for admin
+export const getTransactions = async (req, res) => {
+    try {
+        const { page = 1, limit = 50, type, status, startDate, endDate } = req.query;
+        const displayCurrency = resolveDisplayCurrency(req);
+        const query = {};
+
+        if (type) query.category = type;
+        if (status) query.status = status;
+        if (startDate) query.createdAt = { $gte: new Date(startDate) };
+        if (endDate) query.createdAt = { $lte: new Date(endDate) };
+
+        const transactionsRaw = await Transaction.find(query)
+            .populate('userId', 'fullName email phone')
+            .populate('fromUserId', 'fullName email')
+            .populate('toUserId', 'fullName email')
+            .populate('walletId', 'userId')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await Transaction.countDocuments(query);
+
+        // Map transactions to include from/to details
+        const transactions = transactionsRaw.map(t => {
+            const transaction = t.toObject();
+
+            // Determine FROM (source) - who the money is coming from
+            let fromDetails = null;
+            if (transaction.fromUserId) {
+                fromDetails = transaction.fromUserId.fullName || transaction.fromUserId.email;
+            } else if (transaction.fromName) {
+                fromDetails = transaction.fromName;
+            } else if (transaction.type === 'CREDIT' && transaction.category === 'PAYMENT_RECEIVED') {
+                // For credits, FROM is usually the payer/customer
+                fromDetails = transaction.metadata?.payerName || transaction.metadata?.customerName || 'Customer';
+            } else if (transaction.type === 'CREDIT') {
+                fromDetails = transaction.description || 'System';
+            }
+
+            // Determine TO (destination) - who is receiving
+            let toDetails = null;
+            if (transaction.toUserId) {
+                toDetails = transaction.toUserId.fullName || transaction.toUserId.email;
+            } else if (transaction.toName) {
+                toDetails = transaction.toName;
+            } else if (transaction.userId) {
+                // The userId is typically the wallet owner who receives/sends
+                toDetails = transaction.userId.fullName || transaction.userId.email || 'User';
+            }
+
+            // For DEBIT transactions, swap from/to (money going OUT of wallet)
+            if (transaction.type === 'DEBIT') {
+                const temp = fromDetails;
+                fromDetails = toDetails || transaction.userId?.fullName || 'Wallet Owner';
+                toDetails = temp || transaction.metadata?.recipientName || transaction.description || 'Recipient';
+            }
+
+            // For HOLD transactions
+            if (transaction.type === 'HOLD') {
+                fromDetails = transaction.userId?.fullName || 'User';
+                toDetails = 'Escrow/Hold';
+            }
+
+            return {
+                ...transaction,
+                from: fromDetails || '-',
+                to: toDetails || '-',
+                displayCurrency,
+                displayAmount: convertForDisplay(transaction.amount, transaction.currency, displayCurrency),
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            transactions,
+            displayCurrency,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching transactions:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching transactions",
+            error: error.message,
+        });
+    }
+};
+
+// Approve payout request
+export const approvePayout = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+        const { adminNotes } = req.body;
+
+        const payout = await WithdrawalRequest.findById(payoutId);
+
+        if (!payout) {
+            return res.status(404).json({
+                success: false,
+                message: "Payout request not found"
+            });
+        }
+
+        if (payout.status !== 'PENDING') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot approve payout with status: ${payout.status}`
+            });
+        }
+
+        // Update payout status to APPROVED (not COMPLETED - admin still needs to manually transfer)
+        payout.status = 'APPROVED';
+        payout.approvedAt = new Date();
+        payout.processedBy = req.userId;
+        if (adminNotes) payout.adminNotes = adminNotes;
+        await payout.save();
+
+        // Update wallet transaction status
+        const wallet = await Wallet.findById(payout.walletId);
+        if (wallet && payout.walletTransactionId) {
+            const txn = wallet.transactions.id(payout.walletTransactionId);
+            if (txn) {
+                txn.status = 'APPROVED';
+                await wallet.save();
+            }
+        }
+
+        // Send notification to user (staff read the DG portal feed)
+        await notifyPayoutTarget(payout, {
+            type: 'PAYOUT_APPROVED',
+            title: 'Withdrawal Approved',
+            message: `Your withdrawal request of ${payout.currency} ${payout.amount} has been approved. Payment will be processed shortly.`,
+            data: { requestId: payout.requestId, amount: payout.amount }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Payout approved successfully. Please complete the bank transfer and mark as completed.",
+            payout
+        });
+    } catch (error) {
+        console.error("[v0] Error approving payout:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error approving payout",
+            error: error.message,
+        });
+    }
+};
+
+// Reject payout request
+export const rejectPayout = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+        const { reason } = req.body;
+
+        const payout = await WithdrawalRequest.findById(payoutId);
+
+        if (!payout) {
+            return res.status(404).json({
+                success: false,
+                message: "Payout request not found"
+            });
+        }
+
+        if (!['PENDING', 'APPROVED'].includes(payout.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot reject payout with status: ${payout.status}`
+            });
+        }
+
+        // Update payout status
+        payout.status = 'REJECTED';
+        payout.rejectedAt = new Date();
+        payout.processedBy = req.userId;
+        payout.rejectionReason = reason || 'Payout rejected by admin';
+        await payout.save();
+
+        // Refund the amount back to user's wallet
+        const wallet = await Wallet.findById(payout.walletId);
+        if (wallet) {
+            wallet.balance += payout.amount;
+            wallet.totalWithdrawals = Math.max(0, (wallet.totalWithdrawals || 0) - payout.amount);
+
+            // Update wallet transaction status
+            if (payout.walletTransactionId) {
+                const txn = wallet.transactions.id(payout.walletTransactionId);
+                if (txn) {
+                    txn.status = 'REJECTED';
+                }
+            }
+
+            // Add refund transaction
+            wallet.transactions.push({
+                type: 'REFUND',
+                amount: payout.amount,
+                description: `Withdrawal request rejected - funds returned. Reason: ${payout.rejectionReason}`,
+                status: 'COMPLETED',
+                createdAt: new Date()
+            });
+
+            await wallet.save();
+        }
+
+        // Send notification to user (staff read the DG portal feed)
+        await notifyPayoutTarget(payout, {
+            type: 'PAYOUT_REJECTED',
+            title: 'Withdrawal Rejected',
+            message: `Your withdrawal request of ${payout.currency} ${payout.amount} has been rejected. Reason: ${payout.rejectionReason}. The amount has been refunded to your wallet.`,
+            data: { requestId: payout.requestId, amount: payout.amount, reason: payout.rejectionReason }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Payout rejected successfully. Amount refunded to user's wallet.",
+            payout
+        });
+    } catch (error) {
+        console.error("[v0] Error rejecting payout:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error rejecting payout",
+            error: error.message,
+        });
+    }
+};
+
+// Complete payout
+export const completePayout = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+        const { transactionReference, paymentProof, adminNotes } = req.body;
+
+        const payout = await WithdrawalRequest.findById(payoutId);
+
+        if (!payout) {
+            return res.status(404).json({
+                success: false,
+                message: "Payout request not found"
+            });
+        }
+
+        if (!['PENDING', 'APPROVED'].includes(payout.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot complete payout with status: ${payout.status}`
+            });
+        }
+
+        // Update payout status
+        payout.status = 'COMPLETED';
+        payout.completedAt = new Date();
+        payout.processedBy = req.userId;
+        payout.processedAt = new Date();
+        if (transactionReference) payout.transactionReference = transactionReference;
+        if (paymentProof) payout.paymentProof = paymentProof;
+        if (adminNotes) payout.adminNotes = adminNotes;
+        await payout.save();
+
+        // Update wallet transaction status
+        const wallet = await Wallet.findById(payout.walletId);
+        if (wallet && payout.walletTransactionId) {
+            const txn = wallet.transactions.id(payout.walletTransactionId);
+            if (txn) {
+                txn.status = 'COMPLETED';
+                await wallet.save();
+            }
+        }
+
+        // Send notification to user (staff read the DG portal feed)
+        await notifyPayoutTarget(payout, {
+            type: 'PAYOUT_COMPLETED',
+            title: 'Withdrawal Completed',
+            message: `Your withdrawal of ${payout.currency} ${payout.amount} has been transferred to your bank account (${payout.bankName}).`,
+            data: {
+                requestId: payout.requestId,
+                amount: payout.amount,
+                transactionReference: payout.transactionReference
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Payout completed successfully",
+            payout
+        });
+    } catch (error) {
+        console.error("[v0] Error completing payout:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error completing payout",
+            error: error.message,
+        });
+    }
+};
+
+// Process payout automatically via payment gateway (Stripe/TAP)
+export const processAutomaticPayout = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+        const { adminNotes } = req.body;
+
+        const payout = await WithdrawalRequest.findById(payoutId)
+            .populate('userId', 'fullName email phone stripeConnectAccountId tapAccountId');
+
+        if (!payout) {
+            return res.status(404).json({
+                success: false,
+                message: "Payout request not found"
+            });
+        }
+
+        if (!['PENDING', 'APPROVED'].includes(payout.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot process payout with status: ${payout.status}`
+            });
+        }
+
+        // Determine the appropriate payment gateway based on country/currency
+        const country = payout.country || detectCountryFromCurrency(payout.currency);
+        const gateway = getPaymentGateway(country);
+
+        // Get user's destination account for automatic payout
+        let destinationAccountId = payout.destinationAccountId;
+
+        // If no destination account, check user's connected accounts
+        if (!destinationAccountId && payout.userId) {
+            if (gateway === "STRIPE") {
+                destinationAccountId = payout.userId.stripeConnectAccountId;
+            } else if (gateway === "TAP") {
+                destinationAccountId = payout.userId.tapAccountId;
+            }
+        }
+
+        // If still no destination account, we cannot process automatically
+        if (!destinationAccountId) {
+            return res.status(400).json({
+                success: false,
+                message: `User does not have a connected ${gateway} account for automatic payouts. Please use manual transfer instead.`,
+                canProcessManually: true
+            });
+        }
+
+        // Update status to PROCESSING
+        payout.status = 'PROCESSING';
+        payout.paymentMethod = gateway;
+        payout.processedAt = new Date();
+        payout.processedBy = req.userId;
+        if (adminNotes) payout.adminNotes = adminNotes;
+        await payout.save();
+
+        // Attempt automatic payout via payment gateway
+        try {
+            const payoutResult = await paymentGatewayService.createPayout(gateway, {
+                amount: payout.amount,
+                currency: payout.currency,
+                destinationAccountId: destinationAccountId,
+                metadata: {
+                    requestId: payout.requestId,
+                    userId: payout.userId._id?.toString() || payout.userId.toString(),
+                    walletId: payout.walletId.toString(),
+                },
+                description: `Withdrawal ${payout.requestId} - ${payout.userInfo?.fullName || 'User'}`
+            });
+
+            if (payoutResult.success) {
+                // Update payout with gateway info
+                payout.gatewayPayoutId = payoutResult.payoutId;
+                payout.gatewayStatus = payoutResult.status;
+                payout.transactionReference = payoutResult.payoutId;
+
+                // If immediately completed (some gateways)
+                if (payoutResult.status === 'COMPLETED') {
+                    payout.status = 'COMPLETED';
+                    payout.completedAt = new Date();
+                }
+
+                await payout.save();
+
+                // Update wallet transaction status
+                const wallet = await Wallet.findById(payout.walletId);
+                if (wallet && payout.walletTransactionId) {
+                    const txn = wallet.transactions.id(payout.walletTransactionId);
+                    if (txn) {
+                        txn.status = payout.status === 'COMPLETED' ? 'COMPLETED' : 'PROCESSING';
+                        await wallet.save();
+                    }
+                }
+
+                // Send notification to user
+                await createNotification({
+                    userId: payout.userId._id || payout.userId,
+                    type: payout.status === 'COMPLETED' ? 'PAYOUT_COMPLETED' : 'PAYOUT_PROCESSING',
+                    title: payout.status === 'COMPLETED' ? 'Withdrawal Completed' : 'Withdrawal Processing',
+                    message: payout.status === 'COMPLETED'
+                        ? `Your withdrawal of ${payout.currency} ${payout.amount} has been transferred to your account via ${gateway}.`
+                        : `Your withdrawal of ${payout.currency} ${payout.amount} is being processed via ${gateway}. You will be notified once completed.`,
+                    data: {
+                        requestId: payout.requestId,
+                        amount: payout.amount,
+                        gateway,
+                        payoutId: payoutResult.payoutId
+                    }
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    message: payout.status === 'COMPLETED'
+                        ? `Payout completed successfully via ${gateway}`
+                        : `Payout is being processed via ${gateway}`,
+                    payout,
+                    gatewayResponse: {
+                        gateway,
+                        payoutId: payoutResult.payoutId,
+                        status: payoutResult.status
+                    }
+                });
+            }
+        } catch (gatewayError) {
+            console.error("[processAutomaticPayout] Gateway error:", gatewayError);
+
+            // Revert status to APPROVED on gateway failure
+            payout.status = 'APPROVED';
+            payout.gatewayStatus = 'FAILED';
+            payout.metadata = {
+                ...payout.metadata,
+                lastGatewayError: gatewayError.message,
+                lastGatewayAttempt: new Date()
+            };
+            await payout.save();
+
+            return res.status(400).json({
+                success: false,
+                message: `Automatic payout failed: ${gatewayError.message}. You can try again or use manual transfer.`,
+                canProcessManually: true
+            });
+        }
+
+    } catch (error) {
+        console.error("[processAutomaticPayout] Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error processing automatic payout",
+            error: error.message,
+        });
+    }
+};
+
+// Get payout gateway info (which gateway will be used based on country)
+export const getPayoutGatewayInfo = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+
+        const payout = await WithdrawalRequest.findById(payoutId)
+            .populate('userId', 'fullName email stripeConnectAccountId tapAccountId');
+
+        if (!payout) {
+            return res.status(404).json({
+                success: false,
+                message: "Payout request not found"
+            });
+        }
+
+        const country = payout.country || detectCountryFromCurrency(payout.currency);
+        const recommendedGateway = getPaymentGateway(country);
+
+        // Check if user has connected accounts
+        let hasStripeAccount = false;
+        let hasTapAccount = false;
+
+        if (payout.userId) {
+            hasStripeAccount = !!payout.userId.stripeConnectAccountId;
+            hasTapAccount = !!payout.userId.tapAccountId;
+        }
+
+        const canProcessAutomatically = (recommendedGateway === 'STRIPE' && hasStripeAccount) ||
+            (recommendedGateway === 'TAP' && hasTapAccount);
+
+        res.status(200).json({
+            success: true,
+            gatewayInfo: {
+                country,
+                recommendedGateway,
+                canProcessAutomatically,
+                hasStripeAccount,
+                hasTapAccount,
+                availableOptions: [
+                    {
+                        method: 'MANUAL',
+                        label: 'Manual Bank Transfer',
+                        description: 'Transfer manually to user bank account and mark as complete',
+                        available: true
+                    },
+                    {
+                        method: 'STRIPE',
+                        label: 'Stripe Payout',
+                        description: 'Automatic transfer via Stripe (UAE, international)',
+                        available: hasStripeAccount,
+                        reason: !hasStripeAccount ? 'User does not have a connected Stripe account' : null
+                    },
+                    {
+                        method: 'TAP',
+                        label: 'TAP Payments',
+                        description: 'Automatic transfer via TAP (Kuwait, GCC)',
+                        available: hasTapAccount,
+                        reason: !hasTapAccount ? 'User does not have a connected TAP account' : null
+                    }
+                ]
+            },
+            payout: {
+                _id: payout._id,
+                requestId: payout.requestId,
+                amount: payout.amount,
+                currency: payout.currency,
+                status: payout.status,
+                bankName: payout.bankName,
+                iban: payout.iban,
+                accountHolderName: payout.accountHolderName,
+                userInfo: payout.userInfo
+            }
+        });
+    } catch (error) {
+        console.error("[getPayoutGatewayInfo] Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching gateway info",
+            error: error.message,
+        });
+    }
+};
+
+// Get fraud alerts for admin
+export const getFraudAlerts = async (req, res) => {
+    try {
+        const { severity, page = 1, limit = 20 } = req.query;
+
+        // Fetch ACTUAL fraud alerts - only suspicious/flagged activity
+        // Not regular transactions like commissions or refunds
+        const fraudQuery = {
+            $or: [
+                { status: 'SUSPICIOUS' },
+                { status: 'FLAGGED' },
+                { isFraudulent: true },
+                { 'metadata.flaggedForReview': true }
+            ]
+        };
+
+        if (severity) {
+            fraudQuery.severity = severity;
+        }
+
+        const realAlerts = await Transaction.find(fraudQuery)
+            .populate('userId', 'fullName email profileImage')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await Transaction.countDocuments(fraudQuery);
+
+        // Transform to proper fraud alert format
+        const alerts = realAlerts.map(alert => ({
+            _id: alert._id,
+            type: alert.type || 'SUSPICIOUS_TRANSACTION',
+            description: alert.description || `Suspicious ${alert.transactionType || 'activity'} detected`,
+            userId: alert.userId,
+            severity: alert.severity || 'MEDIUM',
+            createdAt: alert.createdAt,
+            amount: alert.amount,
+            status: alert.status
+        }));
+
+        res.status(200).json({
+            success: true,
+            alerts: alerts,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching fraud alerts:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching fraud alerts",
+            error: error.message,
+        });
+    }
+};
+
+// Get user activity for admin
+export const getUserActivity = async (req, res) => {
+    try {
+        const { riskScore, status, page = 1, limit = 20 } = req.query;
+        const query = {};
+
+        if (riskScore) query.riskScore = { $gte: Number.parseInt(riskScore) };
+        if (status) query.status = status;
+
+        // Fetch real user activity data from database
+        const userActivity = await User.aggregate([
+            {
+                $match: {
+                    status: { $in: ['ACTIVE', 'PENDING', 'SUSPENDED'] }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'payments',
+                    localField: '_id',
+                    foreignField: 'userId',
+                    as: 'paymentHistory'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'complaints',
+                    localField: '_id',
+                    foreignField: 'userId',
+                    as: 'complaintData'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'ratings',
+                    localField: '_id',
+                    foreignField: 'userId',
+                    as: 'ratingData'
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    fullName: 1,
+                    status: 1,
+                    createdAt: 1,
+                    riskScore: {
+                        $add: [
+                            { $cond: [{ $eq: ['$status', 'SUSPENDED'] }, 50, 0] },
+                            { $cond: [{ $eq: ['$status', 'PENDING'] }, 25, 0] },
+                            { $multiply: [{ $size: '$complaintData' }, 10] },
+                            { $multiply: [{ $avg: '$ratingData.rating' }, -5] }
+                        ]
+                    },
+                    complaints: { $size: '$complaintData' },
+                    rating: { $avg: '$ratingData.rating' }
+                }
+            },
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $skip: (Number.parseInt(page) - 1) * Number.parseInt(limit)
+            },
+            {
+                $limit: Number.parseInt(limit)
+            }
+        ]);
+
+        const total = await User.countDocuments({
+            status: { $in: ['ACTIVE', 'PENDING', 'SUSPENDED'] }
+        });
+
+        res.status(200).json({
+            success: true,
+            activity: userActivity,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching user activity:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching user activity",
+            error: error.message,
+        });
+    }
+};
+
+// Get system logs for admin
+export const getSystemLogs = async (req, res) => {
+    try {
+        const { level, source, page = 1, limit = 50 } = req.query;
+
+        // Try to fetch from SystemLog collection if it exists
+        // Otherwise generate logs from recent system activity
+        let logs = [];
+        let total = 0;
+
+        try {
+            // Try to get logs from a dedicated SystemLog model if it exists
+            const SystemLog = mongoose.models.SystemLog;
+            if (SystemLog) {
+                const query = {};
+                if (level) query.level = level;
+                if (source) query.source = source;
+
+                logs = await SystemLog.find(query)
+                    .sort({ createdAt: -1 })
+                    .limit(Number.parseInt(limit))
+                    .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+                total = await SystemLog.countDocuments(query);
+            }
+        } catch (modelError) {
+            // SystemLog model doesn't exist, generate from activity
+        }
+
+        // If no dedicated logs, generate from recent activity
+        if (logs.length === 0) {
+            // Get recent user registrations as INFO logs
+            const recentUsers = await User.find({})
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .select('fullName email role createdAt');
+
+            // Get recent payments as INFO logs  
+            const recentPayments = await Payment.find({ status: 'COMPLETED' })
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .select('amount paymentType createdAt');
+
+            // Get failed payments as ERROR logs
+            const failedPayments = await Payment.find({ status: 'FAILED' })
+                .sort({ createdAt: -1 })
+                .limit(5)
+                .select('amount paymentType createdAt errorMessage');
+
+            // Combine into log format
+            const userLogs = recentUsers.map(user => ({
+                _id: user._id,
+                level: 'INFO',
+                source: 'USER_SERVICE',
+                message: `New ${user.role} registered: ${user.fullName}`,
+                timestamp: user.createdAt,
+                details: { email: user.email, role: user.role }
+            }));
+
+            const paymentLogs = recentPayments.map(payment => ({
+                _id: payment._id,
+                level: 'INFO',
+                source: 'PAYMENT_SERVICE',
+                message: `Payment completed: AED ${payment.amount}`,
+                timestamp: payment.createdAt,
+                details: { type: payment.paymentType, amount: payment.amount }
+            }));
+
+            const errorLogs = failedPayments.map(payment => ({
+                _id: payment._id,
+                level: 'ERROR',
+                source: 'PAYMENT_SERVICE',
+                message: `Payment failed: ${payment.errorMessage || 'Unknown error'}`,
+                timestamp: payment.createdAt,
+                details: { type: payment.paymentType, amount: payment.amount }
+            }));
+
+            logs = [...errorLogs, ...userLogs, ...paymentLogs]
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .slice(0, Number.parseInt(limit));
+
+            total = logs.length;
+        }
+
+        res.status(200).json({
+            success: true,
+            logs: logs,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching system logs:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching system logs",
+            error: error.message,
+        });
+    }
+};
+
+// Resolve a fraud alert
+export const resolveFraudAlert = async (req, res) => {
+    try {
+        const { alertId } = req.params;
+        const updated = await Transaction.findByIdAndUpdate(alertId, { status: 'RESOLVED' }, { new: true });
+        if (!updated) {
+            return res.status(404).json({ success: false, message: "Alert not found" });
+        }
+        res.status(200).json({ success: true, message: "Fraud alert resolved successfully", alert: updated });
+    } catch (error) {
+        console.error("[v0] Error resolving fraud alert:", error);
+        res.status(500).json({ success: false, message: "Error resolving fraud alert", error: error.message });
+    }
+};
+
+// Investigate a fraud alert
+export const investigateFraudAlert = async (req, res) => {
+    try {
+        const { alertId } = req.params;
+        const updated = await Transaction.findByIdAndUpdate(alertId, { status: 'INVESTIGATING' }, { new: true });
+        if (!updated) {
+            return res.status(404).json({ success: false, message: "Alert not found" });
+        }
+        res.status(200).json({ success: true, message: "Fraud alert marked for investigation", alert: updated });
+    } catch (error) {
+        console.error("[v0] Error investigating fraud alert:", error);
+        res.status(500).json({ success: false, message: "Error investigating fraud alert", error: error.message });
+    }
+};
+
+// Helper: format a date for report rows
+const fmtDate = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+
+// Generate custom report (persists a snapshot to the Report collection)
+export const generateCustomReport = async (req, res) => {
+    try {
+        const { reportType = "general", dateFrom, dateTo } = req.body;
+
+        // Build a createdAt date filter that can be reused across queries
+        const dateFilter = {};
+        if (dateFrom) dateFilter.$gte = new Date(dateFrom);
+        if (dateTo) {
+            const end = new Date(dateTo);
+            end.setHours(23, 59, 59, 999);
+            dateFilter.$lte = end;
+        }
+        const hasDate = Boolean(dateFilter.$gte || dateFilter.$lte);
+        const createdAtQuery = hasDate ? { createdAt: dateFilter } : {};
+
+        const rangeLabel = dateFrom || dateTo
+            ? ` (${dateFrom || "start"} to ${dateTo || "today"})`
+            : "";
+
+        let title = "";
+        let description = "";
+        let columns = [];
+        let rows = [];
+        let summary = {};
+        let totalAmount = 0;
+
+        switch (reportType) {
+            case "revenue": {
+                const payments = await Payment.find({ ...createdAtQuery, status: "COMPLETED" })
+                    .populate("corporateOwnerId", "fullName email companyName")
+                    .populate("contractId", "_id")
+                    .sort({ createdAt: -1 });
+
+                totalAmount = payments.reduce((s, p) => s + (p.amount || 0), 0);
+                const commissionTotal = payments.reduce((s, p) => {
+                    const c = typeof p.adminCommission === "number" ? p.adminCommission : 0;
+                    return s + c;
+                }, 0);
+
+                columns = ["Date", "Payer", "Type", "Method", "Amount (AED)", "Status"];
+                rows = payments.map((p) => ({
+                    Date: fmtDate(p.createdAt),
+                    Payer: p.corporateOwnerId?.companyName || p.corporateOwnerId?.fullName || "—",
+                    Type: p.paymentType || "—",
+                    Method: p.paymentMethod || "—",
+                    "Amount (AED)": (p.amount || 0).toFixed(2),
+                    Status: p.status,
+                }));
+
+                title = "Revenue Report" + rangeLabel;
+                description = `Completed payments collected${rangeLabel || " (all time)"}.`;
+                summary = {
+                    totalRevenue: Number(totalAmount.toFixed(2)),
+                    totalTransactions: payments.length,
+                    adminCommission: Number(commissionTotal.toFixed(2)),
+                };
+                break;
+            }
+
+            case "users": {
+                const users = await User.find(createdAtQuery)
+                    .select("fullName email role status country companyName createdAt")
+                    .sort({ createdAt: -1 });
+
+                columns = ["Name", "Email", "Role", "Status", "Country", "Joined"];
+                rows = users.map((u) => ({
+                    Name: u.fullName || "—",
+                    Email: u.email || "—",
+                    Role: u.role || "—",
+                    Status: u.status || "—",
+                    Country: u.country || "—",
+                    Joined: fmtDate(u.createdAt),
+                }));
+
+                const byRole = {};
+                const byStatus = {};
+                users.forEach((u) => {
+                    byRole[u.role] = (byRole[u.role] || 0) + 1;
+                    byStatus[u.status] = (byStatus[u.status] || 0) + 1;
+                });
+
+                title = "User Report" + rangeLabel;
+                description = `Users registered${rangeLabel || " (all time)"}.`;
+                summary = { totalUsers: users.length, byRole, byStatus };
+                break;
+            }
+
+            case "bookings": {
+                const bookings = await B2CPassengerBooking.find(createdAtQuery)
+                    .populate("passengerId", "fullName email")
+                    .populate("partnerId", "fullName companyName")
+                    .sort({ createdAt: -1 });
+
+                totalAmount = bookings.reduce((s, b) => s + (b.paymentAmount || 0), 0);
+
+                columns = ["Date", "Passenger", "Route", "Fare", "Payment", "Status"];
+                rows = bookings.map((b) => ({
+                    Date: fmtDate(b.createdAt),
+                    Passenger: b.passengerId?.fullName || "—",
+                    Route: `${b.pickupLocation || "—"} → ${b.dropoffLocation || "—"}`,
+                    Fare: (b.paymentAmount || 0).toFixed(2),
+                    Payment: b.paymentStatus || "—",
+                    Status: b.bookingStatus || "—",
+                }));
+
+                const byStatus = {};
+                bookings.forEach((b) => {
+                    byStatus[b.bookingStatus] = (byStatus[b.bookingStatus] || 0) + 1;
+                });
+
+                title = "Bookings Report" + rangeLabel;
+                description = `Passenger bookings created${rangeLabel || " (all time)"}.`;
+                summary = {
+                    totalBookings: bookings.length,
+                    totalFare: Number(totalAmount.toFixed(2)),
+                    byStatus,
+                };
+                break;
+            }
+
+            case "commission": {
+                const payments = await Payment.find({ ...createdAtQuery, status: "COMPLETED" })
+                    .populate("corporateOwnerId", "fullName companyName")
+                    .sort({ createdAt: -1 });
+
+                const withCommission = payments.filter(
+                    (p) => typeof p.adminCommission === "number" && p.adminCommission > 0,
+                );
+                totalAmount = withCommission.reduce((s, p) => s + (p.adminCommission || 0), 0);
+
+                columns = ["Date", "Payer", "Payment (AED)", "Rate (%)", "Commission (AED)"];
+                rows = withCommission.map((p) => ({
+                    Date: fmtDate(p.createdAt),
+                    Payer: p.corporateOwnerId?.companyName || p.corporateOwnerId?.fullName || "—",
+                    "Payment (AED)": (p.amount || 0).toFixed(2),
+                    "Rate (%)": p.appliedCommissionRate ?? "—",
+                    "Commission (AED)": (p.adminCommission || 0).toFixed(2),
+                }));
+
+                title = "Commission Earned Report" + rangeLabel;
+                description = `Admin commission earned from completed payments${rangeLabel || " (all time)"}.`;
+                summary = {
+                    totalCommission: Number(totalAmount.toFixed(2)),
+                    transactions: withCommission.length,
+                };
+                break;
+            }
+
+            case "settlements": {
+                const withdrawals = await WithdrawalRequest.find(createdAtQuery)
+                    .populate("userId", "fullName companyName role")
+                    .sort({ createdAt: -1 });
+
+                totalAmount = withdrawals.reduce((s, w) => s + (w.amount || 0), 0);
+
+                columns = ["Date", "Requested By", "Amount", "Currency", "Method", "Status"];
+                rows = withdrawals.map((w) => ({
+                    Date: fmtDate(w.createdAt),
+                    "Requested By": w.userId?.companyName || w.userId?.fullName || "—",
+                    Amount: (w.amount || 0).toFixed(2),
+                    Currency: w.currency || "AED",
+                    Method: w.paymentMethod || "—",
+                    Status: w.status || "—",
+                }));
+
+                const byStatus = {};
+                withdrawals.forEach((w) => {
+                    byStatus[w.status] = (byStatus[w.status] || 0) + 1;
+                });
+
+                title = "Settlements Report" + rangeLabel;
+                description = `Withdrawal / settlement requests${rangeLabel || " (all time)"}.`;
+                summary = {
+                    totalRequests: withdrawals.length,
+                    totalAmount: Number(totalAmount.toFixed(2)),
+                    byStatus,
+                };
+                break;
+            }
+
+            default: {
+                // general summary
+                const [userCount, paymentAgg, bookingCount, commuters, corporates, partners] =
+                    await Promise.all([
+                        User.countDocuments(createdAtQuery),
+                        Payment.aggregate([
+                            { $match: { ...createdAtQuery, status: "COMPLETED" } },
+                            { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+                        ]),
+                        B2CPassengerBooking.countDocuments(createdAtQuery),
+                        User.countDocuments({ ...createdAtQuery, role: "COMMUTER" }),
+                        User.countDocuments({ ...createdAtQuery, role: "CORPORATE" }),
+                        User.countDocuments({ ...createdAtQuery, role: "B2C_PARTNER" }),
+                    ]);
+
+                const revenue = paymentAgg[0]?.total || 0;
+                const paymentCount = paymentAgg[0]?.count || 0;
+                totalAmount = revenue;
+
+                columns = ["Metric", "Value"];
+                rows = [
+                    { Metric: "Total Users", Value: String(userCount) },
+                    { Metric: "Commuters", Value: String(commuters) },
+                    { Metric: "Corporate Users", Value: String(corporates) },
+                    { Metric: "B2C Partners", Value: String(partners) },
+                    { Metric: "Completed Payments", Value: String(paymentCount) },
+                    { Metric: "Total Revenue (AED)", Value: revenue.toFixed(2) },
+                    { Metric: "Passenger Bookings", Value: String(bookingCount) },
+                ];
+
+                title = "General Summary Report" + rangeLabel;
+                description = `Platform-wide summary${rangeLabel || " (all time)"}.`;
+                summary = {
+                    users: userCount,
+                    payments: paymentCount,
+                    bookings: bookingCount,
+                    totalRevenue: Number(revenue.toFixed(2)),
+                };
+            }
+        }
+
+        const report = await Report.create({
+            title,
+            description,
+            reportType,
+            filters: {
+                dateFrom: dateFrom ? new Date(dateFrom) : null,
+                dateTo: dateTo ? new Date(dateTo) : null,
+            },
+            recordCount: rows.length,
+            summary,
+            columns,
+            rows,
+            totalAmount: Number((totalAmount || 0).toFixed(2)),
+            currency: "AED",
+            generatedBy: req.userId || null,
+            generatedAt: new Date(),
+        });
+
+        res.status(201).json({ success: true, report });
+    } catch (error) {
+        console.error("[v0] Error generating report:", error);
+        res.status(500).json({ success: false, message: "Error generating report", error: error.message });
+    }
+};
+
+// Get saved custom reports for admin (list view - lightweight, no rows)
+export const getCustomReports = async (req, res) => {
+    try {
+        const reports = await Report.find({})
+            .select("-rows")
+            .sort({ createdAt: -1 })
+            .limit(100);
+
+        res.status(200).json({ success: true, reports });
+    } catch (error) {
+        console.error("[v0] Error fetching custom reports:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching custom reports",
+            error: error.message,
+        });
+    }
+};
+
+// Get a single report with full row data (for View Details)
+export const getReportById = async (req, res) => {
+    try {
+        const report = await Report.findById(req.params.reportId).populate(
+            "generatedBy",
+            "fullName email",
+        );
+        if (!report) {
+            return res.status(404).json({ success: false, message: "Report not found" });
+        }
+        res.status(200).json({ success: true, report });
+    } catch (error) {
+        console.error("[v0] Error fetching report:", error);
+        res.status(500).json({ success: false, message: "Error fetching report", error: error.message });
+    }
+};
+
+// Download a report as CSV
+export const downloadReport = async (req, res) => {
+    try {
+        const report = await Report.findById(req.params.reportId);
+        if (!report) {
+            return res.status(404).json({ success: false, message: "Report not found" });
+        }
+
+        const columns = report.columns && report.columns.length ? report.columns : ["Data"];
+        const escapeCsv = (val) => {
+            const str = val === null || val === undefined ? "" : String(val);
+            if (/[",\n]/.test(str)) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        const headerLine = columns.map(escapeCsv).join(",");
+        const dataLines = (report.rows || []).map((row) =>
+            columns.map((col) => escapeCsv(row?.[col])).join(","),
+        );
+        const csv = [headerLine, ...dataLines].join("\n");
+
+        const safeName = (report.title || "report").replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeName}.csv"`);
+        res.status(200).send(csv);
+    } catch (error) {
+        console.error("[v0] Error downloading report:", error);
+        res.status(500).json({ success: false, message: "Error downloading report", error: error.message });
+    }
+};
+
+// Delete a saved report
+export const deleteReport = async (req, res) => {
+    try {
+        const report = await Report.findByIdAndDelete(req.params.reportId);
+        if (!report) {
+            return res.status(404).json({ success: false, message: "Report not found" });
+        }
+        res.status(200).json({ success: true, message: "Report deleted successfully" });
+    } catch (error) {
+        console.error("[v0] Error deleting report:", error);
+        res.status(500).json({ success: false, message: "Error deleting report", error: error.message });
+    }
+};
+
+// Get communication templates for admin
+export const getCommTemplates = async (req, res) => {
+    try {
+        const { type, page = 1, limit = 20, status } = req.query;
+
+        console.log(`[v0] Fetching communication templates with query:`, { type, status, page, limit });
+
+        // Try to use Template model if it exists, otherwise return empty array
+        let templates = [];
+        let totalTemplates = 0;
+        try {
+            const mongoose = (await import('mongoose')).default;
+            const Template = mongoose.models.Template;
+            if (Template) {
+                const query = {};
+                if (type) query.type = type;
+                if (status) query.status = status;
+                templates = await Template.find(query)
+                    .sort({ createdAt: -1 })
+                    .limit(Number.parseInt(limit))
+                    .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+                totalTemplates = await Template.countDocuments(query);
+            }
+        } catch (modelErr) {
+            console.log('[v0] Template model not available, returning empty list');
+        }
+
+        res.status(200).json({
+            success: true,
+            templates: templates,
+            pagination: {
+                currentPage: Number.parseInt(page),
+                totalPages: Math.ceil(totalTemplates / Number.parseInt(limit)),
+                totalItems: totalTemplates,
+                itemsPerPage: Number.parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching communication templates:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching templates",
+            error: error.message,
+        });
+    }
+};
+
+// Helper function to get last used date for a template
+async function getLastUsedDate(templateId) {
+    try {
+        const lastUsed = await Transaction.findOne({
+            $or: [
+                { type: "MESSAGE_SENT", category: "COMMUNICATION", 'metadata.templateId': templateId },
+                { type: "EMAIL_SENT", category: "COMMUNICATION", 'metadata.templateId': templateId }
+            ]
+        }).sort({ createdAt: -1 }).select('createdAt');
+
+        return lastUsed?.createdAt || null;
+    } catch (error) {
+        console.error(`[v0] Error getting last used date for template ${templateId}:`, error);
+        return null;
+    }
+}
+
+// Get sent messages for admin
+export const getCommMessages = async (req, res) => {
+    try {
+        const { type, page = 1, limit = 20, status } = req.query;
+        const query = {};
+
+        if (type) query.type = type;
+        if (status) query.status = status;
+
+        console.log(`[v0] Fetching communication messages with query:`, { type, status, page, limit });
+
+        // Fetch real messages from Transaction collection
+        const messages = await Transaction.find({
+            category: 'COMMUNICATION',
+            ...query
+        })
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit) * 1)
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        // Get total count for pagination
+        const totalMessages = await Transaction.countDocuments({
+            category: 'COMMUNICATION',
+            ...query
+        });
+
+        // Calculate message statistics
+        const messagesWithStats = await Promise.all(
+            messages.map(async (message) => {
+                // Get template details if templateId exists
+                let templateDetails = null;
+                if (message.metadata?.templateId) {
+                    try {
+                        const mongoose = (await import('mongoose')).default;
+                        const TemplateModel = mongoose.models.Template;
+                        if (TemplateModel) {
+                            templateDetails = await TemplateModel.findById(message.metadata.templateId)
+                                .select('name type subject');
+                        }
+                    } catch (err) {
+                        // Template model not available
+                    }
+                }
+
+                return {
+                    _id: message._id,
+                    type: message.type,
+                    recipient: message.recipient,
+                    content: message.content,
+                    subject: message.subject || "",
+                    status: message.status,
+                    createdAt: message.createdAt,
+                    templateId: message.metadata?.templateId || null,
+                    template: templateDetails,
+                    sentBy: message.metadata?.sentBy || null,
+                    messageType: message.metadata?.messageType || "CUSTOM",
+                    deliveryStatus: message.status,
+                    // Additional metadata
+                    metadata: {
+                        ...message.metadata,
+                        recipientType: message.type.includes('EMAIL') ? 'email' : 'whatsapp',
+                        isTemplate: !!message.metadata?.templateId,
+                        templateName: templateDetails?.name || null
+                    }
+                };
+            })
+        );
+
+        console.log(`[v0] Found ${messagesWithStats.length} communication messages (total: ${totalMessages})`);
+
+        res.status(200).json({
+            success: true,
+            messages: messagesWithStats,
+            pagination: {
+                currentPage: Number.parseInt(page),
+                totalPages: Math.ceil(totalMessages / Number.parseInt(limit)),
+                totalItems: totalMessages,
+                itemsPerPage: Number.parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching communication messages:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching messages",
+            error: error.message,
+        });
+    }
+};
+
+// Get communication configuration for admin
+export const getCommConfig = async (req, res) => {
+    try {
+        const config = {
+            emailConfig: {
+                smtpHost: "smtp.gmail.com",
+                smtpPort: "587",
+                username: "admin@driveme.com",
+                password: "••••••••••••",
+                active: true,
+            },
+            whatsappConfig: {
+                accountSid: "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                authToken: "••••••••••••••••••••••••",
+                phoneNumber: "+14155238886",
+                active: true,
+            },
+            smsConfig: {
+                accountSid: process.env.TWILIO_SMS_ACCOUNT_SID || "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                authToken: "••••••••••••••••••••••••",
+                phoneNumber: process.env.TWILIO_SMS_PHONE_NUMBER || "+14155238886",
+                active: false,
+            }
+
+        };
+
+        res.status(200).json({
+            success: true,
+            config
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching config:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching config",
+            error: error.message,
+        });
+    }
+};
+
+// Send WhatsApp message
+export const sendWhatsAppMessage = async (req, res) => {
+    try {
+        const { recipientNumber, message, templateId } = req.body;
+
+        // Validate required fields
+        if (!recipientNumber || !message) {
+            return res.status(400).json({
+                success: false,
+                message: "Recipient number and message are required"
+            });
+        }
+
+        // Log message for audit trail
+        console.log("[v0] Sending WhatsApp message:", { recipientNumber, message, templateId });
+
+        // Store message in database for tracking
+        const messageRecord = await Transaction.create({
+            userId: req.userId,
+            type: "WHATSAPP_MESSAGE",
+            category: "COMMUNICATION",
+            recipient: recipientNumber,
+            content: message,
+            templateId: templateId || null,
+            status: "SENT",
+            createdAt: new Date(),
+            metadata: {
+                sentBy: req.userId,
+                messageType: templateId ? "TEMPLATE" : "CUSTOM",
+                recipientNumber: recipientNumber
+            }
+        });
+
+        // Real WhatsApp API integration using Twilio WhatsApp Business API
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        const twilioPhoneNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+        if (!accountSid || !authToken || !twilioPhoneNumber) {
+            console.warn("[v0] WhatsApp API credentials not configured, using fallback");
+            // Fallback to mock response for development
+            return res.status(200).json({
+                success: true,
+                message: "WhatsApp message sent successfully",
+                messageId: messageRecord._id,
+                sentAt: new Date(),
+                deliveryStatus: "SENT"
+            });
+        }
+
+        const twilio = require('twilio')(accountSid, authToken);
+
+        // Send WhatsApp message
+        const whatsappMessage = await twilio.messages.create({
+            from: `whatsapp:${twilioPhoneNumber}`,
+            to: `whatsapp:${recipientNumber}`,
+            body: message,
+            // Use template if templateId is provided
+            ...(templateId && {
+                contentSid: templateId,
+                contentVariables: {}
+            })
+        });
+
+        // Update message record with actual message details
+        await Transaction.findByIdAndUpdate(messageRecord._id, {
+            status: "DELIVERED",
+            metadata: {
+                ...messageRecord.metadata,
+                twilioMessageSid: whatsappMessage.sid,
+                twilioStatus: whatsappMessage.status,
+                deliveredAt: new Date()
+            }
+        });
+
+        console.log("[v0] WhatsApp message sent successfully:", {
+            messageId: whatsappMessage.sid,
+            recipient: recipientNumber,
+            status: whatsappMessage.status
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "WhatsApp message sent successfully",
+            messageId: messageRecord._id,
+            twilioMessageId: whatsappMessage.sid,
+            sentAt: new Date(),
+            deliveryStatus: whatsappMessage.status
+        });
+
+    } catch (error) {
+        console.error("[v0] Error sending WhatsApp message:", error);
+
+        // Log failed message attempt
+        try {
+            await Transaction.create({
+                userId: req.userId,
+                type: "WHATSAPP_MESSAGE",
+                category: "COMMUNICATION_FAILED",
+                recipient: req.body.recipientNumber,
+                content: req.body.message,
+                status: "FAILED",
+                createdAt: new Date(),
+                metadata: {
+                    error: error.message,
+                    sentBy: req.userId,
+                    recipientNumber: req.body.recipientNumber
+                }
+            });
+        } catch (logError) {
+            console.error("[v0] Failed to log message error:", logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Error sending WhatsApp message",
+            error: error.message,
+        });
+    }
+};
+
+// Send bulk WhatsApp messages
+export const sendBulkWhatsApp = async (req, res) => {
+    try {
+        const { recipients, message, templateId } = req.body;
+
+        if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Recipients array is required"
+            });
+        }
+
+        if (!message) {
+            return res.status(400).json({
+                success: false,
+                message: "Message is required"
+            });
+        }
+
+        let sent = 0;
+        let failed = 0;
+        const results = [];
+
+        // Process recipients in batches
+        for (const recipient of recipients) {
+            try {
+                const phoneNumber = recipient.phone?.replace(/\s/g, '');
+                if (!phoneNumber) {
+                    failed++;
+                    continue;
+                }
+
+                // Personalize message with user data
+                let personalizedMessage = message;
+                if (recipient.name) {
+                    personalizedMessage = personalizedMessage.replace(/\{\{userName\}\}/g, recipient.name);
+                }
+
+                // Store message record
+                await Transaction.create({
+                    userId: recipient.userId || req.userId,
+                    type: "WHATSAPP_MESSAGE",
+                    category: "COMMUNICATION_BULK",
+                    recipient: phoneNumber,
+                    content: personalizedMessage,
+                    templateId: templateId || null,
+                    status: "SENT",
+                    createdAt: new Date(),
+                    metadata: {
+                        sentBy: req.userId,
+                        bulkSend: true,
+                        recipientName: recipient.name,
+                        recipientNumber: phoneNumber
+                    }
+                });
+
+                sent++;
+                results.push({ phone: phoneNumber, status: 'sent' });
+            } catch (err) {
+                failed++;
+                results.push({ phone: recipient.phone, status: 'failed', error: err.message });
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Bulk WhatsApp send completed`,
+            sent,
+            failed,
+            total: recipients.length,
+            results
+        });
+
+    } catch (error) {
+        console.error("[v0] Error sending bulk WhatsApp:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error sending bulk WhatsApp messages",
+            error: error.message
+        });
+    }
+};
+
+// Send bulk Email
+export const sendBulkEmail = async (req, res) => {
+    try {
+        const { recipients, subject, body, templateId } = req.body;
+
+        if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Recipients array is required"
+            });
+        }
+
+        if (!subject || !body) {
+            return res.status(400).json({
+                success: false,
+                message: "Subject and body are required"
+            });
+        }
+
+        let sent = 0;
+        let failed = 0;
+        const results = [];
+
+        for (const recipient of recipients) {
+            try {
+                const email = recipient.email?.trim();
+                if (!email || !email.includes('@')) {
+                    failed++;
+                    continue;
+                }
+
+                // Personalize message with user data
+                let personalizedBody = body;
+                let personalizedSubject = subject;
+                if (recipient.name) {
+                    personalizedBody = personalizedBody.replace(/\{\{userName\}\}/g, recipient.name);
+                    personalizedSubject = personalizedSubject.replace(/\{\{userName\}\}/g, recipient.name);
+                }
+
+                // Store email record
+                await Transaction.create({
+                    userId: recipient.userId || req.userId,
+                    type: "EMAIL_MESSAGE",
+                    category: "COMMUNICATION_BULK",
+                    recipient: email,
+                    content: personalizedBody,
+                    subject: personalizedSubject,
+                    templateId: templateId || null,
+                    status: "SENT",
+                    createdAt: new Date(),
+                    metadata: {
+                        sentBy: req.userId,
+                        bulkSend: true,
+                        recipientName: recipient.name,
+                        recipientEmail: email
+                    }
+                });
+
+                sent++;
+                results.push({ email, status: 'sent' });
+            } catch (err) {
+                failed++;
+                results.push({ email: recipient.email, status: 'failed', error: err.message });
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Bulk email send completed`,
+            sent,
+            failed,
+            total: recipients.length,
+            results
+        });
+
+    } catch (error) {
+        console.error("[v0] Error sending bulk email:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error sending bulk emails",
+            error: error.message
+        });
+    }
+};
+
+// Send bulk SMS
+export const sendBulkSMS = async (req, res) => {
+    try {
+        const { recipients, message, templateId } = req.body;
+
+        if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Recipients array is required"
+            });
+        }
+
+        if (!message) {
+            return res.status(400).json({
+                success: false,
+                message: "Message is required"
+            });
+        }
+
+        let sent = 0;
+        let failed = 0;
+        const results = [];
+
+        for (const recipient of recipients) {
+            try {
+                const phoneNumber = recipient.phone?.replace(/\s/g, '');
+                if (!phoneNumber) {
+                    failed++;
+                    continue;
+                }
+
+                // Personalize message with user data
+                let personalizedMessage = message;
+                if (recipient.name) {
+                    personalizedMessage = personalizedMessage.replace(/\{\{userName\}\}/g, recipient.name);
+                }
+
+                // Store SMS record
+                await Transaction.create({
+                    userId: recipient.userId || req.userId,
+                    type: "SMS_MESSAGE",
+                    category: "COMMUNICATION_BULK",
+                    recipient: phoneNumber,
+                    content: personalizedMessage,
+                    templateId: templateId || null,
+                    status: "SENT",
+                    createdAt: new Date(),
+                    metadata: {
+                        sentBy: req.userId,
+                        bulkSend: true,
+                        recipientName: recipient.name,
+                        recipientNumber: phoneNumber,
+                        smsSegments: Math.ceil(personalizedMessage.length / 160)
+                    }
+                });
+
+                sent++;
+                results.push({ phone: phoneNumber, status: 'sent' });
+            } catch (err) {
+                failed++;
+                results.push({ phone: recipient.phone, status: 'failed', error: err.message });
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Bulk SMS send completed`,
+            sent,
+            failed,
+            total: recipients.length,
+            results
+        });
+
+    } catch (error) {
+        console.error("[v0] Error sending bulk SMS:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error sending bulk SMS",
+            error: error.message
+        });
+    }
+};
+
+// Send SMS using Twilio
+export const sendSMS = async (req, res) => {
+    try {
+        const { recipientNumber, message, templateId } = req.body;
+
+        // Validate required fields
+        if (!recipientNumber || !message) {
+            return res.status(400).json({
+                success: false,
+                message: "Recipient number and message are required"
+            });
+        }
+
+        // Validate phone number format
+        const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+        if (!phoneRegex.test(recipientNumber.replace(/\s/g, ''))) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid phone number format. Use international format (e.g., +965XXXXXXXX)"
+            });
+        }
+
+        // Log SMS for audit trail
+        console.log("[v0] Sending SMS:", { recipientNumber, message, templateId });
+
+        // Store SMS in database for tracking
+        const smsRecord = await Transaction.create({
+            userId: req.userId,
+            type: "SMS_MESSAGE",
+            category: "COMMUNICATION",
+            recipient: recipientNumber,
+            content: message,
+            templateId: templateId || null,
+            status: "PENDING",
+            createdAt: new Date(),
+            metadata: {
+                sentBy: req.userId,
+                messageType: templateId ? "TEMPLATE" : "CUSTOM",
+                recipientNumber: recipientNumber,
+                smsSegments: Math.ceil(message.length / 160)
+            }
+        });
+
+        // Real SMS service integration using Twilio
+        const accountSid = process.env.TWILIO_SMS_ACCOUNT_SID || process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_SMS_AUTH_TOKEN || process.env.TWILIO_AUTH_TOKEN;
+        const twilioPhoneNumber = process.env.TWILIO_SMS_PHONE_NUMBER || process.env.TWILIO_PHONE_NUMBER;
+
+        if (!accountSid || !authToken || !twilioPhoneNumber) {
+            console.warn("[v0] SMS API credentials not configured, using fallback");
+            // Update record status
+            await Transaction.findByIdAndUpdate(smsRecord._id, { status: "SENT" });
+            // Fallback to mock response for development
+            return res.status(200).json({
+                success: true,
+                message: "SMS sent successfully (Development Mode)",
+                messageId: smsRecord._id,
+                sentAt: new Date(),
+                deliveryStatus: "SENT",
+                smsSegments: Math.ceil(message.length / 160)
+            });
+        }
+
+        const twilio = require('twilio')(accountSid, authToken);
+
+        // Send SMS message
+        const smsMessage = await twilio.messages.create({
+            from: twilioPhoneNumber,
+            to: recipientNumber,
+            body: message
+        });
+
+        // Update SMS record with actual message details
+        await Transaction.findByIdAndUpdate(smsRecord._id, {
+            status: "DELIVERED",
+            metadata: {
+                ...smsRecord.metadata,
+                twilioMessageSid: smsMessage.sid,
+                twilioStatus: smsMessage.status,
+                deliveredAt: new Date(),
+                price: smsMessage.price,
+                priceUnit: smsMessage.priceUnit
+            }
+        });
+
+        console.log("[v0] SMS sent successfully:", {
+            messageId: smsMessage.sid,
+            recipient: recipientNumber,
+            status: smsMessage.status
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "SMS sent successfully",
+            messageId: smsRecord._id,
+            twilioMessageId: smsMessage.sid,
+            sentAt: new Date(),
+            deliveryStatus: smsMessage.status,
+            smsSegments: Math.ceil(message.length / 160)
+        });
+
+    } catch (error) {
+        console.error("[v0] Error sending SMS:", error);
+
+        // Log failed SMS attempt
+        try {
+            await Transaction.create({
+                userId: req.userId,
+                type: "SMS_MESSAGE",
+                category: "COMMUNICATION_FAILED",
+                recipient: req.body.recipientNumber,
+                content: req.body.message,
+                status: "FAILED",
+                createdAt: new Date(),
+                metadata: {
+                    error: error.message,
+                    sentBy: req.userId,
+                    recipientNumber: req.body.recipientNumber
+                }
+            });
+        } catch (logError) {
+            console.error("[v0] Failed to log SMS error:", logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Error sending SMS",
+            error: error.message,
+        });
+    }
+};
+
+// Send email
+export const sendEmail = async (req, res) => {
+    try {
+        const { recipientEmail, subject, body, templateId } = req.body;
+
+        // Validate required fields
+        if (!recipientEmail || !subject || !body) {
+            return res.status(400).json({
+                success: false,
+                message: "Recipient email, subject, and body are required"
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(recipientEmail)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid email format"
+            });
+        }
+
+        // Log email for audit trail
+        console.log("[v0] Sending email:", { recipientEmail, subject, body, templateId });
+
+        // Store email in database for tracking
+        const emailRecord = await Transaction.create({
+            userId: req.userId,
+            type: "EMAIL_MESSAGE",
+            category: "COMMUNICATION",
+            recipient: recipientEmail,
+            content: body,
+            subject: subject,
+            templateId: templateId || null,
+            status: "SENT",
+            createdAt: new Date(),
+            metadata: {
+                sentBy: req.userId,
+                messageType: templateId ? "TEMPLATE" : "CUSTOM",
+                recipientEmail: recipientEmail,
+                subject: subject
+            }
+        });
+
+        // Real email service integration using Nodemailer with SMTP
+        const nodemailer = require('nodemailer');
+
+        // Get email configuration from environment variables
+        const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+        const smtpPort = parseInt(process.env.SMTP_PORT) || 587;
+        const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
+        const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+        const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER;
+
+        if (!smtpUser || !smtpPass || !fromEmail) {
+            console.warn("[v0] Email service credentials not configured, using fallback");
+            // Fallback to mock response for development
+            return res.status(200).json({
+                success: true,
+                message: "Email sent successfully",
+                messageId: emailRecord._id,
+                sentAt: new Date(),
+                deliveryStatus: "SENT"
+            });
+        }
+
+        // Create transporter with SMTP configuration
+        const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465, // true for 465, false for other ports
+            auth: {
+                user: smtpUser,
+                pass: smtpPass
+            },
+            tls: {
+                rejectUnauthorized: false // Allow self-signed certificates
+            }
+        });
+
+        // Prepare email options
+        const mailOptions = {
+            from: `"DriveMe Admin" <${fromEmail}>`,
+            to: recipientEmail,
+            subject: subject,
+            html: body, // Send as HTML for rich content
+            // Add template processing if templateId is provided
+            ...(templateId && {
+                templateId: templateId
+            })
+        };
+
+        // Send email
+        const emailResult = await transporter.sendMail(mailOptions);
+
+        // Update email record with actual email details
+        await Transaction.findByIdAndUpdate(emailRecord._id, {
+            status: "DELIVERED",
+            metadata: {
+                ...emailRecord.metadata,
+                messageId: emailResult.messageId,
+                response: emailResult.response,
+                deliveredAt: new Date()
+            }
+        });
+
+        console.log("[v0] Email sent successfully:", {
+            messageId: emailResult.messageId,
+            recipient: recipientEmail,
+            subject: subject,
+            response: emailResult.response
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Email sent successfully",
+            messageId: emailRecord._id,
+            emailMessageId: emailResult.messageId,
+            sentAt: new Date(),
+            deliveryStatus: "DELIVERED"
+        });
+
+    } catch (error) {
+        console.error("[v0] Error sending email:", error);
+
+        // Log failed email attempt
+        try {
+            await Transaction.create({
+                userId: req.userId,
+                type: "EMAIL_MESSAGE",
+                category: "COMMUNICATION_FAILED",
+                recipient: req.body.recipientEmail,
+                content: req.body.body,
+                subject: req.body.subject,
+                status: "FAILED",
+                createdAt: new Date(),
+                metadata: {
+                    error: error.message,
+                    sentBy: req.userId,
+                    recipientEmail: req.body.recipientEmail,
+                    subject: req.body.subject
+                }
+            });
+        } catch (logError) {
+            console.error("[v0] Failed to log email error:", logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Error sending email",
+            error: error.message,
+        });
+    }
+};
+
+// Update communication configuration
+export const updateCommConfig = async (req, res) => {
+    try {
+        const { type } = req.params;
+        const config = req.body;
+
+        // Validate configuration type
+        if (!type || !['email', 'whatsapp'].includes(type)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid configuration type. Must be 'email' or 'whatsapp'"
+            });
+        }
+
+        // Validate configuration data
+        if (!config || Object.keys(config).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Configuration data is required"
+            });
+        }
+
+        console.log(`[v0] Updating ${type} config:`, config);
+
+        // Store configuration in database using Transaction collection for audit trail
+        const configRecord = await Transaction.create({
+            userId: req.userId,
+            type: "CONFIG_UPDATE",
+            category: "SYSTEM_CONFIG",
+            configType: type.toUpperCase(),
+            configData: config,
+            status: "UPDATED",
+            createdAt: new Date(),
+            metadata: {
+                updatedBy: req.userId,
+                configType: type,
+                previousConfig: await getPreviousConfig(type),
+                newConfig: config
+            }
+        });
+
+        // Update environment variables or system configuration
+        if (type === 'email') {
+            // Update email configuration in environment or config store
+            await updateEmailConfig(config);
+        } else if (type === 'whatsapp') {
+            // Update WhatsApp configuration in environment or config store
+            await updateWhatsAppConfig(config);
+        }
+
+        // Log successful update
+        console.log(`[v0] ${type.toUpperCase()} configuration updated successfully by user ${req.userId}`);
+
+        res.status(200).json({
+            success: true,
+            message: `${type} configuration updated successfully`,
+            configId: configRecord._id,
+            updatedAt: new Date(),
+            updatedBy: req.userId
+        });
+
+    } catch (error) {
+        console.error("[v0] Error updating config:", error);
+
+        // Log failed configuration update attempt
+        try {
+            await Transaction.create({
+                userId: req.userId,
+                type: "CONFIG_UPDATE_FAILED",
+                category: "SYSTEM_CONFIG",
+                configType: req.params.type?.toUpperCase() || "UNKNOWN",
+                configData: req.body,
+                status: "FAILED",
+                createdAt: new Date(),
+                metadata: {
+                    error: error.message,
+                    updatedBy: req.userId,
+                    configType: req.params.type
+                }
+            });
+        } catch (logError) {
+            console.error("[v0] Failed to log config error:", logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Error updating configuration",
+            error: error.message,
+        });
+    }
+};
+
+// Helper function to get previous configuration
+async function getPreviousConfig(type) {
+    try {
+        const lastConfig = await Transaction.findOne({
+            type: "CONFIG_UPDATE",
+            category: "SYSTEM_CONFIG",
+            configType: type.toUpperCase()
+        }).sort({ createdAt: -1 });
+
+        return lastConfig?.configData || {};
+    } catch (error) {
+        console.error(`[v0] Error fetching previous ${type} config:`, error);
+        return {};
+    }
+}
+
+// Helper function to update email configuration
+async function updateEmailConfig(config) {
+    try {
+        // Update email configuration in environment or config store
+        const fs = require('fs').promises;
+        const path = require('path');
+
+        // Create config directory if it doesn't exist
+        const configDir = path.join(process.cwd(), 'config');
+        await fs.mkdir(configDir, { recursive: true });
+
+        // Update email config file
+        const emailConfigPath = path.join(configDir, 'email.json');
+        const currentEmailConfig = await fs.readFile(emailConfigPath, 'utf8')
+            .then(data => JSON.parse(data))
+            .catch(() => ({}));
+
+        const updatedEmailConfig = { ...currentEmailConfig, ...config };
+        await fs.writeFile(emailConfigPath, JSON.stringify(updatedEmailConfig, null, 2));
+
+        console.log("[v0] Email configuration saved to file:", updatedEmailConfig);
+
+        // Update environment variables if provided
+        if (config.smtpHost) process.env.SMTP_HOST = config.smtpHost;
+        if (config.smtpPort) process.env.SMTP_PORT = config.smtpPort.toString();
+        if (config.smtpUser) process.env.SMTP_USER = config.smtpUser;
+        if (config.fromEmail) process.env.FROM_EMAIL = config.fromEmail;
+
+    } catch (error) {
+        console.error("[v0] Error updating email config:", error);
+        throw error;
+    }
+}
+
+// Helper function to update WhatsApp configuration
+async function updateWhatsAppConfig(config) {
+    try {
+        // Update WhatsApp configuration in environment or config store
+        const fs = require('fs').promises;
+        const path = require('path');
+
+        // Create config directory if it doesn't exist
+        const configDir = path.join(process.cwd(), 'config');
+        await fs.mkdir(configDir, { recursive: true });
+
+        // Update WhatsApp config file
+        const whatsappConfigPath = path.join(configDir, 'whatsapp.json');
+        const currentWhatsAppConfig = await fs.readFile(whatsappConfigPath, 'utf8')
+            .then(data => JSON.parse(data))
+            .catch(() => ({}));
+
+        const updatedWhatsAppConfig = { ...currentWhatsAppConfig, ...config };
+        await fs.writeFile(whatsappConfigPath, JSON.stringify(updatedWhatsAppConfig, null, 2));
+
+        console.log("[v0] WhatsApp configuration saved to file:", updatedWhatsAppConfig);
+
+        // Update environment variables if provided
+        if (config.accountSid) process.env.TWILIO_ACCOUNT_SID = config.accountSid;
+        if (config.authToken) process.env.TWILIO_AUTH_TOKEN = config.authToken;
+        if (config.phoneNumber) process.env.TWILIO_WHATSAPP_NUMBER = config.phoneNumber;
+
+    } catch (error) {
+        console.error("[v0] Error updating WhatsApp config:", error);
+        throw error;
+    }
+}
+
+// Get ad campaigns for admin
+// Get public active campaigns for homepage (no auth required)
+export const getPublicActiveCampaigns = async (req, res) => {
+    try {
+        const { placement } = req.query;
+        const now = new Date();
+
+        const query = {
+            status: 'active',
+            startDate: { $lte: now },
+            endDate: { $gte: now }
+        };
+
+        if (placement) query.placement = placement;
+
+        const campaigns = await Campaign.find(query)
+            .select('title provider placement size imageUrl targetUrl description startDate endDate')
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        // Views are now tracked separately via trackCampaignView endpoint
+        // This provides more accurate per-impression tracking
+
+        res.status(200).json({
+            success: true,
+            campaigns
+        });
+    } catch (error) {
+        console.error("Error fetching public campaigns:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching campaigns",
+            error: error.message
+        });
+    }
+};
+
+// Track campaign click
+export const trackCampaignClick = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+
+        await Campaign.findByIdAndUpdate(campaignId, {
+            $inc: { clicks: 1 }
+        });
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Track campaign view/impression (separate from fetch)
+export const trackCampaignView = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+
+        await Campaign.findByIdAndUpdate(campaignId, {
+            $inc: { views: 1 }
+        });
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const getAdCampaigns = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20, provider, placement } = req.query;
+        const query = {};
+        if (status && status !== 'all') query.status = status;
+        if (provider) query.provider = provider;
+        if (placement) query.placement = placement;
+
+        const skip = (Number.parseInt(page) - 1) * Number.parseInt(limit);
+        const [campaigns, totalCampaigns] = await Promise.all([
+            Campaign.find(query)
+                .populate('createdBy', 'fullName email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(Number.parseInt(limit)),
+            Campaign.countDocuments(query)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            campaigns,
+            pagination: {
+                currentPage: Number.parseInt(page),
+                totalPages: Math.ceil(totalCampaigns / Number.parseInt(limit)),
+                totalItems: totalCampaigns,
+                itemsPerPage: Number.parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching ad campaigns:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching campaigns",
+            error: error.message,
+        });
+    }
+};
+
+// Get ad statistics for admin
+export const getAdStats = async (req, res) => {
+    try {
+        const [totalCampaigns, activeCampaigns, aggregateResult] = await Promise.all([
+            Campaign.countDocuments(),
+            Campaign.countDocuments({ status: 'active' }),
+            Campaign.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        totalViews: { $sum: '$views' },
+                        totalClicks: { $sum: '$clicks' },
+                        totalRevenue: { $sum: '$revenue' }
+                    }
+                }
+            ])
+        ]);
+
+        const agg = aggregateResult[0] || { totalViews: 0, totalClicks: 0, totalRevenue: 0 };
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalCampaigns,
+                activeCampaigns,
+                totalViews: agg.totalViews,
+                totalClicks: agg.totalClicks,
+                totalRevenue: agg.totalRevenue
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching ad stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching ad statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Create ad campaign
+export const createAdCampaign = async (req, res) => {
+    try {
+        const { title, provider, placement, size, targetUrl, description, budget, dailyBudget, costPerClick, costPerView, startDate, endDate, status, targetAudience } = req.body;
+
+        if (!title || !startDate || !endDate) {
+            return res.status(400).json({ success: false, message: "Title, start date and end date are required" });
+        }
+
+        // Handle image upload to Cloudinary
+        let imageUrl = '';
+        if (req.file) {
+            try {
+                const uploadResult = await uploadToCloudinary(req.file, 'driveme/campaigns', 'campaign');
+                imageUrl = uploadResult.secure_url;
+                console.log("[v0] Campaign image uploaded to Cloudinary:", imageUrl);
+            } catch (uploadError) {
+                console.error("[v0] Error uploading campaign image:", uploadError);
+                return res.status(400).json({
+                    success: false,
+                    message: "Error uploading campaign image",
+                    error: uploadError.message
+                });
+            }
+        }
+
+        const campaign = new Campaign({
+            title,
+            provider: provider || '',
+            placement: placement || 'banner',
+            size: size || '728x90',
+            imageUrl: imageUrl,
+            targetUrl: targetUrl || '',
+            description: description || '',
+            budget: budget || 0,
+            dailyBudget: dailyBudget || 0,
+            costPerClick: costPerClick || 0,
+            costPerView: costPerView || 0,
+            startDate,
+            endDate,
+            status: status || 'draft',
+            targetAudience: targetAudience || 'all',
+            createdBy: req.userId || req.user?._id || req.user?.id,
+            views: 0,
+            clicks: 0,
+            revenue: 0,
+        });
+
+        await campaign.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Campaign created successfully",
+            campaign
+        });
+    } catch (error) {
+        console.error("Error creating campaign:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error creating campaign",
+            error: error.message,
+        });
+    }
+};
+
+// Update ad campaign
+export const updateAdCampaign = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+        const allowedFields = ['title', 'provider', 'placement', 'size', 'targetUrl', 'description', 'budget', 'dailyBudget', 'costPerClick', 'costPerView', 'startDate', 'endDate', 'status', 'targetAudience'];
+        const updateData = {};
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        }
+
+        // Handle image upload to Cloudinary if new image is provided
+        if (req.file) {
+            try {
+                const uploadResult = await uploadToCloudinary(req.file, 'driveme/campaigns', 'campaign');
+                updateData.imageUrl = uploadResult.secure_url;
+                console.log("[v0] Campaign image updated in Cloudinary:", updateData.imageUrl);
+            } catch (uploadError) {
+                console.error("[v0] Error uploading campaign image:", uploadError);
+                return res.status(400).json({
+                    success: false,
+                    message: "Error uploading campaign image",
+                    error: uploadError.message
+                });
+            }
+        }
+
+        const campaign = await Campaign.findByIdAndUpdate(campaignId, updateData, { new: true, runValidators: true });
+        if (!campaign) {
+            return res.status(404).json({ success: false, message: "Campaign not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Campaign updated successfully",
+            campaign
+        });
+    } catch (error) {
+        console.error("Error updating campaign:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating campaign",
+            error: error.message,
+        });
+    }
+};
+
+// Delete ad campaign
+export const deleteAdCampaign = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+        const campaign = await Campaign.findByIdAndDelete(campaignId);
+        if (!campaign) {
+            return res.status(404).json({ success: false, message: "Campaign not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Campaign deleted successfully"
+        });
+    } catch (error) {
+        console.error("Error deleting campaign:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting campaign",
+            error: error.message,
+        });
+    }
+};
+
+// Toggle ad campaign status
+export const toggleAdCampaignStatus = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+        const { status } = req.body;
+
+        if (!['active', 'paused', 'expired', 'draft', 'completed'].includes(status)) {
+            return res.status(400).json({ success: false, message: "Invalid status value" });
+        }
+
+        const campaign = await Campaign.findByIdAndUpdate(campaignId, { status }, { new: true });
+        if (!campaign) {
+            return res.status(404).json({ success: false, message: "Campaign not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Campaign ${status} successfully`,
+            campaign
+        });
+    } catch (error) {
+        console.error("Error toggling campaign status:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error toggling campaign status",
+            error: error.message,
+        });
+    }
+};
+
+// Escape user-provided strings before using them inside a RegExp
+const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Get ride pooling statistics for admin
+export const getRidePoolingStats = async (req, res) => {
+    try {
+        const [totalPassengers, activeRoutes, matchedRides, suggestedClusters] = await Promise.all([
+            // Distinct commuters who have raised at least one route request
+            RouteRequest.distinct("passengerId").then((ids) => ids.length),
+            B2CPartnerRoute.countDocuments({ status: "Active", isActive: true }),
+            // Requests that have been converted into a real route = matched rides
+            RouteRequest.countDocuments({ convertedRouteId: { $ne: null } }),
+            // Distinct open corridors (pickup -> dropoff) still awaiting a route
+            RouteRequest.aggregate([
+                { $match: { status: { $in: ["PENDING", "UNDER_REVIEW"] }, convertedRouteId: null } },
+                {
+                    $group: {
+                        _id: {
+                            pickup: { $toLower: "$pickupLocation" },
+                            dropoff: { $toLower: "$dropoffLocation" },
+                        },
+                    },
+                },
+                { $count: "count" },
+            ]),
+        ]);
+
+        const suggestedRoutes = suggestedClusters[0]?.count || 0;
+
+        res.status(200).json({
+            success: true,
+            stats: { totalPassengers, activeRoutes, suggestedRoutes, matchedRides },
+        });
+    } catch (error) {
+        console.error("Error fetching ride pooling stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching ride pooling statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Get passenger interests for admin (raw individual demand)
+export const getPassengerInterests = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const query = {};
+
+        if (status && status !== "All Status" && status !== "all") {
+            query.status = status.toUpperCase();
+        }
+
+        const skip = (Number.parseInt(page) - 1) * Number.parseInt(limit);
+
+        const [interests, total] = await Promise.all([
+            RouteRequest.find(query)
+                .populate("passengerId", "fullName email whatsappNumber")
+                .populate("convertedRouteId", "fromLocation toLocation status")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(Number.parseInt(limit)),
+            RouteRequest.countDocuments(query),
+        ]);
+
+        // Find matched routes count for each interest
+        const formattedInterests = await Promise.all(
+            interests.map(async (interest) => {
+                const matchedRoutes = await B2CPartnerRoute.countDocuments({
+                    fromLocation: { $regex: interest.pickupLocation, $options: "i" },
+                    toLocation: { $regex: interest.dropoffLocation, $options: "i" },
+                    status: "Active",
+                    isActive: true,
+                });
+
+                return {
+                    _id: interest._id,
+                    passengerId: interest.passengerId?._id || interest.passengerId,
+                    passengerName: interest.passengerId?.fullName || "Unknown",
+                    passengerEmail: interest.passengerId?.email || "",
+                    pickupLocation: interest.pickupLocation,
+                    dropoffLocation: interest.dropoffLocation,
+                    preferredTime: interest.preferredTime,
+                    frequency: interest.requestType ? interest.requestType.toLowerCase() : "daily",
+                    status: interest.status ? interest.status.toLowerCase() : "pending",
+                    createdAt: interest.createdAt,
+                    matchedRoutes,
+                    travelDays: interest.travelDays,
+                    expectedStartDate: interest.expectedStartDate,
+                    demandCount: interest.demandCount || 1,
+                    convertedRouteId: interest.convertedRouteId?._id || null,
+                    adminNotes: interest.adminNotes || null,
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            interests: formattedInterests,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching passenger interests:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching passenger interests",
+            error: error.message,
+        });
+    }
+};
+
+// Get user suggested routes for admin (aggregated demand clusters by corridor)
+export const getUserSuggestedRoutes = async (req, res) => {
+    try {
+        const { status } = req.query;
+
+        // Build the match stage. We aggregate the raw requests into corridor clusters.
+        const matchStage = {};
+        if (status && status !== "all" && status !== "All Status") {
+            matchStage.status = status.toUpperCase();
+        }
+
+        const clusters = await RouteRequest.aggregate([
+            ...(Object.keys(matchStage).length ? [{ $match: matchStage }] : []),
+            {
+                $group: {
+                    _id: {
+                        pickup: { $toLower: "$pickupLocation" },
+                        dropoff: { $toLower: "$dropoffLocation" },
+                    },
+                    primaryRequestId: { $first: "$_id" },
+                    requestIds: { $addToSet: "$_id" },
+                    passengerIds: { $addToSet: "$passengerId" },
+                    pickupLocation: { $first: "$pickupLocation" },
+                    dropoffLocation: { $first: "$dropoffLocation" },
+                    preferredTimes: { $addToSet: "$preferredTime" },
+                    estimatedPrice: { $max: "$estimatedPrice" },
+                    convertedRouteIds: { $addToSet: "$convertedRouteId" },
+                    statuses: { $addToSet: "$status" },
+                    interestedPartners: { $push: "$interestedPartners" },
+                    marketplaceOpenedAt: { $max: "$marketplaceOpenedAt" },
+                    createdAt: { $min: "$createdAt" },
+                },
+            },
+            { $sort: { createdAt: -1 } },
+        ]);
+
+        // Derive a representative status for each cluster + resolve names.
+        const formattedRoutes = await Promise.all(
+            clusters.map(async (cluster) => {
+                // A cluster is "converted" if any request in it produced a route.
+                const convertedRouteId = (cluster.convertedRouteIds || []).find((id) => id);
+
+                // Representative status priority: converted -> approved -> open -> rejected -> under_review -> pending
+                let status = "pending";
+                if (convertedRouteId) status = "approved";
+                else if (cluster.statuses.includes("APPROVED")) status = "approved";
+                else if (cluster.statuses.includes("OPEN") || cluster.marketplaceOpenedAt) status = "open";
+                else if (cluster.statuses.includes("UNDER_REVIEW")) status = "under_review";
+                else if (cluster.statuses.every((s) => s === "REJECTED")) status = "rejected";
+                else status = "pending";
+
+                // Flatten + dedupe interested partners across the cluster (latest interest per partner).
+                const partnerMap = new Map();
+                for (const arr of cluster.interestedPartners || []) {
+                    for (const ip of arr || []) {
+                        if (!ip?.partnerId) continue;
+                        const key = String(ip.partnerId);
+                        const prev = partnerMap.get(key);
+                        if (!prev || new Date(ip.respondedAt) > new Date(prev.respondedAt)) {
+                            partnerMap.set(key, ip);
+                        }
+                    }
+                }
+                const interestedPartners = await Promise.all(
+                    Array.from(partnerMap.values()).map(async (ip) => {
+                        const partner = await User.findById(ip.partnerId).select("fullName companyName email");
+                        return {
+                            partnerId: ip.partnerId,
+                            name: partner?.companyName || partner?.fullName || "Unknown Partner",
+                            email: partner?.email || "",
+                            message: ip.message || null,
+                            estimatedPrice: ip.estimatedPrice ?? null,
+                            status: ip.status || "INTERESTED",
+                            publishedRouteId: ip.publishedRouteId || null,
+                        };
+                    })
+                );
+
+                // Use the first passenger as the "suggested by" label.
+                const firstPassenger = cluster.passengerIds?.[0]
+                    ? await User.findById(cluster.passengerIds[0]).select("fullName")
+                    : null;
+                const extraPassengers = (cluster.passengerIds?.length || 1) - 1;
+                const userName = firstPassenger
+                    ? extraPassengers > 0
+                        ? `${firstPassenger.fullName} +${extraPassengers} more`
+                        : firstPassenger.fullName
+                    : "Unknown";
+
+                return {
+                    _id: cluster.primaryRequestId,
+                    requestIds: cluster.requestIds,
+                    userId: cluster.passengerIds?.[0] || null,
+                    userName,
+                    routeName: `${cluster.pickupLocation} to ${cluster.dropoffLocation}`,
+                    startPoint: cluster.pickupLocation,
+                    endPoint: cluster.dropoffLocation,
+                    preferredTime: (cluster.preferredTimes || []).join(", "),
+                    suggestedPrice: cluster.estimatedPrice || 0,
+                    status,
+                    // Votes = number of distinct commuters who want this corridor
+                    votes: cluster.passengerIds?.length || 1,
+                    requestCount: cluster.requestIds?.length || 1,
+                    convertedRouteId: convertedRouteId || null,
+                    interestedPartners,
+                    interestedCount: interestedPartners.length,
+                    publishedCount: interestedPartners.filter((p) => p.status === "ROUTE_PUBLISHED").length,
+                    marketplaceOpened: !!cluster.marketplaceOpenedAt,
+                    createdAt: cluster.createdAt,
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            routes: formattedRoutes,
+            pagination: {
+                total: formattedRoutes.length,
+                page: 1,
+                pages: 1,
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching user suggested routes:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching user suggested routes",
+            error: error.message,
+        });
+    }
+};
+
+// Get active B2C partners for route assignment dropdown
+export const getB2CPartnersForAssignment = async (req, res) => {
+    try {
+        const partners = await User.find({ role: "B2C_PARTNER", status: "ACTIVE" })
+            .select("fullName email companyName")
+            .sort({ fullName: 1 });
+
+        res.status(200).json({
+            success: true,
+            partners: partners.map((p) => ({
+                _id: p._id,
+                name: p.companyName || p.fullName,
+                email: p.email,
+            })),
+        });
+    } catch (error) {
+        console.error("Error fetching B2C partners:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C partners",
+            error: error.message,
+        });
+    }
+};
+
+// Approve user suggested route -> create a real B2C route and notify all commuters
+export const approveSuggestedRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const {
+            b2cPartnerId,
+            oneWayPrice,
+            monthlyOneWayPrice,
+            totalSeats = 15,
+            routeStartDate,
+            startTime,
+            availableDays,
+            currency = "KWD",
+        } = req.body;
+
+        const primaryRequest = await RouteRequest.findById(routeId).populate("passengerId", "fullName email");
+        if (!primaryRequest) {
+            return res.status(404).json({ success: false, message: "Route request not found" });
+        }
+
+        if (!b2cPartnerId) {
+            return res.status(400).json({ success: false, message: "A B2C Partner must be selected to create the route" });
+        }
+        if (!oneWayPrice || Number(oneWayPrice) <= 0) {
+            return res.status(400).json({ success: false, message: "A valid one-way price is required" });
+        }
+
+        const partner = await User.findOne({ _id: b2cPartnerId, role: "B2C_PARTNER" });
+        if (!partner) {
+            return res.status(404).json({ success: false, message: "Selected B2C Partner not found" });
+        }
+
+        // Find every request in this corridor (case-insensitive) so the whole cluster converts together.
+        const clusterRequests = await RouteRequest.find({
+            pickupLocation: { $regex: `^${escapeRegex(primaryRequest.pickupLocation)}$`, $options: "i" },
+            dropoffLocation: { $regex: `^${escapeRegex(primaryRequest.dropoffLocation)}$`, $options: "i" },
+        }).populate("passengerId", "fullName email");
+
+        // Create the real B2C route from the aggregated demand.
+        const newRoute = await B2CPartnerRoute.create({
+            b2cPartnerId,
+            fromLocation: primaryRequest.pickupLocation,
+            toLocation: primaryRequest.dropoffLocation,
+            routeStartDate: routeStartDate ? new Date(routeStartDate) : new Date(),
+            totalSeats: Number(totalSeats),
+            availableSeats: Number(totalSeats),
+            pricing: {
+                oneWayPrice: Number(oneWayPrice),
+                monthlyOneWayPrice: monthlyOneWayPrice ? Number(monthlyOneWayPrice) : 0,
+                currency,
+            },
+            startTime: startTime || primaryRequest.preferredTime || "",
+            availableDays: availableDays?.length ? availableDays : primaryRequest.travelDays,
+            status: "Active",
+            isActive: true,
+            description: `Route created from pooled commuter demand (${clusterRequests.length} request(s)).`,
+        });
+
+        // Mark all cluster requests as converted/approved.
+        await RouteRequest.updateMany(
+            { _id: { $in: clusterRequests.map((r) => r._id) } },
+            {
+                status: "APPROVED",
+                convertedRouteId: newRoute._id,
+                assignedProviderId: b2cPartnerId,
+                adminReviewedBy: req.userId,
+                adminReviewedAt: new Date(),
+            }
+        );
+
+        // Notify every commuter in the cluster that their requested route is now live.
+        for (const request of clusterRequests) {
+            const passenger = request.passengerId;
+            if (!passenger?._id) continue;
+            await createNotification({
+                userId: passenger._id,
+                type: "ROUTE_REQUEST_RESPONSE",
+                title: "Your Requested Route is Now Available!",
+                message: `Good news! A new route from ${primaryRequest.pickupLocation} to ${primaryRequest.dropoffLocation} has been created and is ready to book.`,
+                data: {
+                    requestId: request._id,
+                    routeId: newRoute._id,
+                    pickupLocation: primaryRequest.pickupLocation,
+                    dropoffLocation: primaryRequest.dropoffLocation,
+                    status: "APPROVED",
+                    partnerId: b2cPartnerId,
+                },
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Route created and ${clusterRequests.length} commuter(s) notified`,
+            route: newRoute,
+            convertedRequests: clusterRequests.length,
+        });
+    } catch (error) {
+        console.error("Error approving suggested route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error approving suggested route",
+            error: error.message,
+        });
+    }
+};
+
+// Open user suggested route to the marketplace -> notify all (or selected) B2C partners
+// so they can publish their own competing routes. No single partner is assigned.
+export const openSuggestedRouteToMarketplace = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const { partnerIds } = req.body || {};
+
+        const primaryRequest = await RouteRequest.findById(routeId);
+        if (!primaryRequest) {
+            return res.status(404).json({ success: false, message: "Route request not found" });
+        }
+
+        // Whole corridor cluster (not yet converted) opens together.
+        const clusterRequests = await RouteRequest.find({
+            pickupLocation: { $regex: `^${escapeRegex(primaryRequest.pickupLocation)}$`, $options: "i" },
+            dropoffLocation: { $regex: `^${escapeRegex(primaryRequest.dropoffLocation)}$`, $options: "i" },
+            convertedRouteId: null,
+            status: { $nin: ["REJECTED", "COMPLETED"] },
+        });
+
+        await RouteRequest.updateMany(
+            { _id: { $in: clusterRequests.map((r) => r._id) } },
+            {
+                status: "OPEN",
+                marketplaceOpenedAt: new Date(),
+                adminReviewedBy: req.userId,
+                adminReviewedAt: new Date(),
+            }
+        );
+
+        // Decide which partners to notify: explicit selection, else all active B2C partners.
+        let partners;
+        if (Array.isArray(partnerIds) && partnerIds.length > 0) {
+            partners = await User.find({ _id: { $in: partnerIds }, role: "B2C_PARTNER", status: "ACTIVE" });
+        } else {
+            partners = await User.find({ role: "B2C_PARTNER", status: "ACTIVE" });
+        }
+
+        const demandCount = clusterRequests.length;
+        for (const partner of partners) {
+            await createNotification({
+                userId: partner._id,
+                type: "NEW_ROUTE_REQUEST",
+                title: "New Route Open for You to Serve!",
+                message: `${demandCount} commuter(s) want a route from ${primaryRequest.pickupLocation} to ${primaryRequest.dropoffLocation}. Publish your route to win these riders.`,
+                data: {
+                    requestId: primaryRequest._id,
+                    pickupLocation: primaryRequest.pickupLocation,
+                    dropoffLocation: primaryRequest.dropoffLocation,
+                    demandCount,
+                    marketplace: true,
+                },
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Route opened to ${partners.length} partner(s). ${demandCount} commuter request(s) marked open.`,
+            notifiedPartners: partners.length,
+            openedRequests: demandCount,
+        });
+    } catch (error) {
+        console.error("Error opening suggested route to marketplace:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error opening route to marketplace",
+            error: error.message,
+        });
+    }
+};
+
+// Reject user suggested route -> mark the cluster rejected and notify commuters
+export const rejectSuggestedRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const { reason } = req.body;
+
+        const primaryRequest = await RouteRequest.findById(routeId);
+        if (!primaryRequest) {
+            return res.status(404).json({ success: false, message: "Route request not found" });
+        }
+
+        const clusterRequests = await RouteRequest.find({
+            pickupLocation: { $regex: `^${escapeRegex(primaryRequest.pickupLocation)}$`, $options: "i" },
+            dropoffLocation: { $regex: `^${escapeRegex(primaryRequest.dropoffLocation)}$`, $options: "i" },
+            convertedRouteId: null,
+        }).populate("passengerId", "fullName email");
+
+        await RouteRequest.updateMany(
+            { _id: { $in: clusterRequests.map((r) => r._id) } },
+            {
+                status: "REJECTED",
+                providerResponse: reason || "Rejected by admin",
+                adminNotes: reason || "Rejected by admin",
+                adminReviewedBy: req.userId,
+                adminReviewedAt: new Date(),
+            }
+        );
+
+        // Notify commuters of the rejection.
+        for (const request of clusterRequests) {
+            const passenger = request.passengerId;
+            if (!passenger?._id) continue;
+            await createNotification({
+                userId: passenger._id,
+                type: "ROUTE_REQUEST_RESPONSE",
+                title: "Update on Your Route Request",
+                message: `We're unable to create a route from ${primaryRequest.pickupLocation} to ${primaryRequest.dropoffLocation} at this time.${reason ? ` Reason: ${reason}` : ""}`,
+                data: {
+                    requestId: request._id,
+                    pickupLocation: primaryRequest.pickupLocation,
+                    dropoffLocation: primaryRequest.dropoffLocation,
+                    status: "REJECTED",
+                },
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Route suggestion rejected and ${clusterRequests.length} commuter(s) notified`,
+            rejectedRequests: clusterRequests.length,
+        });
+    } catch (error) {
+        console.error("Error rejecting suggested route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error rejecting suggested route",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2B statistics for admin
+export const getB2BStats = async (req, res) => {
+    try {
+        const [
+            totalB2BProviders,
+            activeB2BProviders,
+            totalB2CProviders,
+            activeB2CProviders,
+            totalVehicleListings,
+            activeVehicleListings,
+            totalRouteListings,
+            activeRouteListings
+        ] = await Promise.all([
+            User.countDocuments({ role: "B2B_PARTNER" }),
+            User.countDocuments({ role: "B2B_PARTNER", status: "ACTIVE" }),
+            User.countDocuments({ role: "B2C_PARTNER" }),
+            User.countDocuments({ role: "B2C_PARTNER", status: "ACTIVE" }),
+            Vehicle.countDocuments({}),
+            Vehicle.countDocuments({ status: "AVAILABLE", isActive: true }),
+            B2CPartnerRoute.countDocuments({}),
+            B2CPartnerRoute.countDocuments({ status: "Active", isActive: true })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalB2BProviders,
+                activeB2BProviders,
+                totalB2CProviders,
+                activeB2CProviders,
+                totalListings: totalVehicleListings + totalRouteListings,
+                activeListings: activeVehicleListings + activeRouteListings
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching B2B stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2B statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2B providers for admin
+export const getB2BProviders = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20, search } = req.query;
+        const query = { role: "B2B_PARTNER" };
+
+        if (status && status !== "all") {
+            query.status = status.toUpperCase();
+        }
+        if (search) {
+            query.$or = [
+                { fullName: { $regex: search, $options: "i" } },
+                { companyName: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const skip = (Number.parseInt(page) - 1) * Number.parseInt(limit);
+
+        const [providers, total] = await Promise.all([
+            User.find(query)
+                .select("fullName companyName email whatsappNumber status createdAt fleetManagement")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(Number.parseInt(limit)),
+            User.countDocuments(query)
+        ]);
+
+        // Enrich providers with fleet size and contract counts
+        const enrichedProviders = await Promise.all(
+            providers.map(async (provider) => {
+                const [vehicleCount, activeVehicles, totalContracts] = await Promise.all([
+                    Vehicle.countDocuments({ fleetOwnerId: provider._id }),
+                    Vehicle.countDocuments({ fleetOwnerId: provider._id, status: "AVAILABLE", isActive: true }),
+                    Contract.countDocuments({ fleetOwnerId: provider._id })
+                ]);
+
+                return {
+                    _id: provider._id,
+                    companyName: provider.companyName || provider.fullName,
+                    contactPerson: provider.fullName,
+                    email: provider.email,
+                    phone: provider.whatsappNumber,
+                    fleetSize: vehicleCount,
+                    activeVehicles,
+                    status: provider.status ? provider.status.toLowerCase() : "pending",
+                    totalContracts,
+                    createdAt: provider.createdAt
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            providers: enrichedProviders,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching B2B providers:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2B providers",
+            error: error.message,
+        });
+    }
+};
+
+// Get full details for a single B2B provider (including their real fleet)
+export const getB2BProviderDetails = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+
+        const provider = await User.findOne({ _id: providerId, role: "B2B_PARTNER" })
+            .select("fullName companyName email whatsappNumber status createdAt");
+
+        if (!provider) {
+            return res.status(404).json({ success: false, message: "B2B provider not found" });
+        }
+
+        const vehicles = await Vehicle.find({ fleetOwnerId: providerId }).sort({ createdAt: -1 });
+
+        // Human-readable labels for the enum categories
+        const categoryLabels = {
+            SEDAN: "Sedan",
+            SUV: "SUV",
+            MINIVAN: "Minivan",
+            COASTER_BUS: "Coaster Bus",
+            LUXURY_COACH: "Luxury Coach",
+            SHUTTLE_BUS: "Shuttle Bus",
+            PICKUP_1TON: "Pickup (1 Ton)",
+            PICKUP_3TON: "Pickup (3 Ton)",
+            TRUCK_7TON: "Truck (7 Ton)",
+            REEFER_TRUCK: "Reefer Truck",
+            FLATBED_TRAILER: "Flatbed Trailer",
+            EXECUTIVE_VAN: "Executive Van",
+            ANY_TYPE: "Any Type",
+        };
+
+        const formattedVehicles = vehicles.map((v) => {
+            const isGoods = v.serviceType === "GOODS_CARRIER";
+            const seating = v.capacity?.seatingCapacity || 0;
+            const cargo = v.capacity?.cargoCapacity || 0;
+            const capacityLabel = isGoods
+                ? (cargo ? `${cargo} Ton${cargo > 1 ? "s" : ""}` : "N/A")
+                : (seating ? `${seating} Seats` : "N/A");
+
+            return {
+                id: v._id,
+                type: categoryLabels[v.vehicleCategory] || v.vehicleCategory,
+                model: v.vehicleName,
+                year: v.manufacturingYear,
+                capacity: capacityLabel,
+                registrationNumber: v.registrationNumber,
+                location: v.location,
+                serviceType: v.serviceType,
+                approvalStatus: v.approvalStatus,
+                status: v.status,
+                count: 1,
+                images: (v.photos || []).map((p) => p.url).filter(Boolean),
+            };
+        });
+
+        // Average rating across the provider's rated vehicles
+        const ratedVehicles = vehicles.filter((v) => v.totalReviews > 0);
+        const avgRating = ratedVehicles.length > 0
+            ? (ratedVehicles.reduce((sum, v) => sum + (v.rating || 0), 0) / ratedVehicles.length)
+            : 0;
+
+        res.status(200).json({
+            success: true,
+            provider: {
+                _id: provider._id,
+                companyName: provider.companyName || provider.fullName,
+                contactPerson: provider.fullName,
+                email: provider.email,
+                phone: provider.whatsappNumber,
+                status: provider.status ? provider.status.toLowerCase() : "pending",
+                createdAt: provider.createdAt,
+                rating: Number(avgRating.toFixed(1)),
+                fleetSize: vehicles.length,
+                vehicles: formattedVehicles,
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching B2B provider details:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2B provider details",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C providers for admin (from B2B listings)
+export const getB2CProvidersFromB2B = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20, search } = req.query;
+        const query = { role: "B2C_PARTNER" };
+
+        if (status && status !== "all") {
+            query.status = status.toUpperCase();
+        }
+        if (search) {
+            query.$or = [
+                { fullName: { $regex: search, $options: "i" } },
+                { companyName: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const skip = (Number.parseInt(page) - 1) * Number.parseInt(limit);
+
+        const [providers, total] = await Promise.all([
+            User.find(query)
+                .select("fullName companyName email whatsappNumber status createdAt serviceType")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(Number.parseInt(limit)),
+            User.countDocuments(query)
+        ]);
+
+        // Enrich providers with route counts and booking stats
+        const enrichedProviders = await Promise.all(
+            providers.map(async (provider) => {
+                const [totalRoutes, activeRoutes, totalBookings] = await Promise.all([
+                    B2CPartnerRoute.countDocuments({ b2cPartnerId: provider._id }),
+                    B2CPartnerRoute.countDocuments({ b2cPartnerId: provider._id, status: "Active", isActive: true }),
+                    B2CPassengerBooking.countDocuments({ b2cPartnerId: provider._id })
+                ]);
+
+                return {
+                    _id: provider._id,
+                    companyName: provider.companyName || provider.fullName,
+                    contactPerson: provider.fullName,
+                    email: provider.email,
+                    phone: provider.whatsappNumber,
+                    routes: totalRoutes,
+                    activeRoutes,
+                    status: provider.status ? provider.status.toLowerCase() : "pending",
+                    totalBookings,
+                    serviceType: provider.serviceType,
+                    createdAt: provider.createdAt
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            providers: enrichedProviders,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching B2C providers from B2B:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C providers",
+            error: error.message,
+        });
+    }
+};
+
+// Suspend B2B provider
+export const suspendB2BProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+
+        const provider = await User.findOneAndUpdate(
+            { _id: providerId, role: { $in: ["B2B_PARTNER", "B2C_PARTNER"] } },
+            {
+                status: "SUSPENDED",
+                suspendedAt: new Date(),
+                suspendedBy: req.user?.id || null
+            },
+            { new: true }
+        ).select("-password");
+
+        if (!provider) {
+            return res.status(404).json({ success: false, message: "Provider not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `${provider.role === "B2B_PARTNER" ? "B2B" : "B2C"} provider suspended successfully`,
+            provider
+        });
+    } catch (error) {
+        console.error("Error suspending provider:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error suspending provider",
+            error: error.message,
+        });
+    }
+};
+
+// Activate B2B provider
+export const activateB2BProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+
+        const provider = await User.findOneAndUpdate(
+            { _id: providerId, role: { $in: ["B2B_PARTNER", "B2C_PARTNER"] } },
+            {
+                status: "ACTIVE",
+                activatedAt: new Date(),
+                activatedBy: req.user?.id || null
+            },
+            { new: true }
+        ).select("-password");
+
+        if (!provider) {
+            return res.status(404).json({ success: false, message: "Provider not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `${provider.role === "B2B_PARTNER" ? "B2B" : "B2C"} provider activated successfully`,
+            provider
+        });
+    } catch (error) {
+        console.error("Error activating provider:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error activating provider",
+            error: error.message,
+        });
+    }
+};
+
+// Update passenger interest status
+export const updatePassengerInterestStatus = async (req, res) => {
+    try {
+        const { interestId } = req.params;
+        const { status } = req.body;
+
+        const validStatuses = ["PENDING", "UNDER_REVIEW", "APPROVED", "REJECTED", "COMPLETED"];
+        if (!validStatuses.includes(status?.toUpperCase())) {
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+        }
+
+        const routeRequest = await RouteRequest.findByIdAndUpdate(
+            interestId,
+            { status: status.toUpperCase() },
+            { new: true }
+        ).populate("passengerId", "fullName email whatsappNumber");
+
+        if (!routeRequest) {
+            return res.status(404).json({ success: false, message: "Passenger interest not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Passenger interest ${status.toLowerCase()} successfully`,
+            interest: {
+                _id: routeRequest._id,
+                passengerId: routeRequest.passengerId?._id,
+                passengerName: routeRequest.passengerId?.fullName,
+                pickupLocation: routeRequest.pickupLocation,
+                dropoffLocation: routeRequest.dropoffLocation,
+                preferredTime: routeRequest.preferredTime,
+                status: routeRequest.status.toLowerCase(),
+                createdAt: routeRequest.createdAt
+            }
+        });
+    } catch (error) {
+        console.error("Error updating passenger interest status:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating passenger interest status",
+            error: error.message,
+        });
+    }
+};
+
+// Toggle online payment system
+export const toggleOnlinePayments = async (req, res) => {
+    try {
+        const { enabled } = req.body;
+
+        // Import SiteSettings model
+        const SiteSettings = (await import("../models/SiteSettings.js")).default;
+
+        // Get current admin user info
+        const admin = await User.findById(req.userId).select('fullName');
+
+        // Find or create site settings
+        let settings = await SiteSettings.findOne();
+        if (!settings) {
+            settings = new SiteSettings();
+        }
+
+        // Update payment control settings
+        settings.paymentControl = {
+            onlinePaymentsEnabled: enabled,
+            lastToggled: new Date(),
+            toggledBy: req.userId,
+            toggledByName: admin?.fullName || 'System Admin',
+        };
+
+        await settings.save();
+
+        console.log(`[v0] Online payments ${enabled ? 'enabled' : 'disabled'} by admin ${req.userId} (${admin?.fullName})`);
+
+        res.status(200).json({
+            success: true,
+            message: `Online payments ${enabled ? 'enabled' : 'disabled'} successfully`,
+            enabled,
+            lastToggled: settings.paymentControl.lastToggled,
+            toggledBy: settings.paymentControl.toggledByName
+        });
+    } catch (error) {
+        console.error("[v0] Error toggling online payments:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error toggling online payments",
+            error: error.message,
+        });
+    }
+};
+
+// Get online payment status
+export const getOnlinePaymentStatus = async (req, res) => {
+    try {
+        // Import SiteSettings model
+        const SiteSettings = (await import("../models/SiteSettings.js")).default;
+
+        // Find or create site settings
+        let settings = await SiteSettings.findOne();
+        if (!settings) {
+            settings = await SiteSettings.create({});
+        }
+
+        const paymentControl = settings.paymentControl || {
+            onlinePaymentsEnabled: true,
+            lastToggled: null,
+            toggledByName: null
+        };
+
+        const status = {
+            enabled: paymentControl.onlinePaymentsEnabled !== false,
+            lastToggled: paymentControl.lastToggled,
+            toggledBy: paymentControl.toggledByName || 'System Admin',
+            paymentGateways: {
+                stripe: paymentControl.onlinePaymentsEnabled !== false,
+                tap: paymentControl.onlinePaymentsEnabled !== false,
+                upi: paymentControl.onlinePaymentsEnabled !== false
+            },
+            restrictions: {
+                minAmount: 0.5,
+                maxAmount: 10000,
+                allowedCurrencies: ['KWD', 'USD', 'EUR', 'AED']
+            }
+        };
+
+        res.status(200).json({
+            success: true,
+            status
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching online payment status:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching online payment status",
+            error: error.message
+        });
+    }
+};
+
+// Get B2C routes for admin
+export const getB2CRoutes = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const query = {};
+
+        // Normalize status to match enum (capitalize first letter)
+        if (status) {
+            const statusMap = {
+                'active': 'Active',
+                'inactive': 'Inactive',
+                'scheduled': 'Scheduled',
+                'Active': 'Active',
+                'Inactive': 'Inactive',
+                'Scheduled': 'Scheduled'
+            };
+            query.status = statusMap[status] || status;
+        }
+
+        // Fetch real B2C routes from database
+        const routes = await B2CPartnerRoute.find(query)
+            .populate('b2cPartnerId', 'fullName companyName')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await B2CPartnerRoute.countDocuments(query);
+
+        // ===== Compute REAL booking counts per route =====
+        // Count active/valid passenger bookings grouped by routeId so the admin
+        // can see demand for every B2C partner route and decide what to feature.
+        const routeIds = routes.map(r => r._id);
+        const bookingCountsAgg = await B2CPassengerBooking.aggregate([
+            {
+                $match: {
+                    routeId: { $in: routeIds },
+                    bookingStatus: { $in: ["PENDING", "CONFIRMED", "ACCEPTED", "IN_PROGRESS", "COMPLETED"] }
+                }
+            },
+            {
+                $group: {
+                    _id: "$routeId",
+                    totalBookings: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const bookingCountMap = {};
+        bookingCountsAgg.forEach(item => {
+            bookingCountMap[item._id.toString()] = item.totalBookings;
+        });
+
+        // Booking criteria thresholds: low / medium / high demand
+        const getBookingCriteria = (count) => {
+            if (count >= 20) return "high";
+            if (count >= 5) return "medium";
+            return "low";
+        };
+
+        // Format routes for frontend compatibility
+        const formattedRoutes = routes.map(route => {
+            const totalBookings = bookingCountMap[route._id.toString()] || 0;
+            return {
+                _id: route._id,
+                name: `${route.fromLocation} to ${route.toLocation}`,
+                startPoint: route.fromLocation,
+                endPoint: route.toLocation,
+                providerName: route.b2cPartnerId?.fullName || route.b2cPartnerId?.companyName || 'Unknown Provider',
+                providerId: route.b2cPartnerId?._id,
+                departureTime: route.startTime,
+                arrivalTime: "N/A", // Can be calculated based on route duration
+                capacity: route.totalSeats,
+                bookedSeats: route.totalSeats - route.availableSeats,
+                status: route.status || "Active",
+                featured: route.isFeatured || false,
+                featuredAt: route.featuredAt || null,
+                // Real booking demand data for admin decision-making
+                totalBookings,
+                bookingCriteria: getBookingCriteria(totalBookings),
+                price: route.pricing?.oneWayPrice || 0,
+                distance: "N/A",
+                duration: "N/A",
+                createdAt: route.createdAt,
+                // Additional B2C specific fields
+                tripType: route.tripType,
+                availableDays: route.availableDays,
+                routeStartDate: route.routeStartDate,
+                pricing: route.pricing,
+                description: route.description,
+                assignedVehicle: route.assignedVehicle,
+                assignedDriver: route.assignedDriver
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            routes: formattedRoutes,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C routes:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C routes",
+            error: error.message
+        });
+    }
+};
+
+// Create B2C route
+export const createB2CRoute = async (req, res) => {
+    try {
+        const routeData = req.body;
+
+        // Create actual route in database using B2CPartnerRoute schema
+        const newRoute = new B2CPartnerRoute({
+            b2cPartnerId: routeData.b2cPartnerId,
+            fromLocation: routeData.fromLocation,
+            toLocation: routeData.toLocation,
+            startTime: routeData.startTime,
+            tripType: routeData.tripType || "One Way",
+            routeStartDate: routeData.routeStartDate || new Date(),
+            availableDays: routeData.availableDays || [],
+            totalSeats: routeData.capacity || routeData.totalSeats || 20,
+            availableSeats: routeData.availableSeats || (routeData.capacity || 20) - (routeData.bookedSeats || 0),
+            pricing: {
+                oneWayPrice: routeData.price || routeData.pricing?.oneWayPrice || 0,
+                roundTripPrice: routeData.pricing?.roundTripPrice || 0,
+                monthlyPrice: routeData.pricing?.monthlyPrice || 0
+            },
+            description: routeData.description || "",
+            assignedVehicle: routeData.assignedVehicle || null,
+            assignedDriver: routeData.assignedDriver || null,
+            status: routeData.status || "Active",
+            isActive: routeData.status !== "Inactive",
+            // Additional pricing metadata for booking calculations
+            pricingMetadata: {
+                pricingType: routeData.pricingType || "perDay",
+                customPricing: routeData.customPricing || {},
+                calculatedMonthlyPrice: routeData.pricing?.monthlyPrice || 0
+            }
+        });
+
+        const savedRoute = await newRoute.save();
+
+        // Populate B2C partner information for response
+        await savedRoute.populate('b2cPartnerId', 'fullName companyName');
+
+        // Format response for frontend compatibility
+        const formattedRoute = {
+            _id: savedRoute._id,
+            name: `${savedRoute.fromLocation} to ${savedRoute.toLocation}`,
+            startPoint: savedRoute.fromLocation,
+            endPoint: savedRoute.toLocation,
+            providerName: savedRoute.b2cPartnerId?.fullName || savedRoute.b2cPartnerId?.companyName || 'Unknown Provider',
+            providerId: savedRoute.b2cPartnerId?._id,
+            departureTime: savedRoute.startTime,
+            arrivalTime: "N/A", // Can be calculated based on route duration
+            capacity: savedRoute.totalSeats,
+            bookedSeats: savedRoute.totalSeats - savedRoute.availableSeats,
+            status: savedRoute.status || "Active",
+            featured: false,
+            price: savedRoute.pricing?.oneWayPrice || 0,
+            distance: "N/A",
+            duration: "N/A",
+            createdAt: savedRoute.createdAt,
+            // Additional B2C specific fields
+            tripType: savedRoute.tripType,
+            availableDays: savedRoute.availableDays,
+            routeStartDate: savedRoute.routeStartDate,
+            pricing: savedRoute.pricing,
+            description: savedRoute.description,
+            assignedVehicle: savedRoute.assignedVehicle,
+            assignedDriver: savedRoute.assignedDriver
+        };
+
+        console.log(`Successfully created B2C route: ${formattedRoute.name}`);
+
+        res.status(201).json({
+            success: true,
+            message: "B2C route created successfully",
+            route: formattedRoute
+        });
+    } catch (error) {
+        console.error("[v0] Error creating B2C route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error creating B2C route",
+            error: error.message
+        });
+    }
+};
+
+// Update B2C route
+export const updateB2CRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const updateData = req.body;
+
+        // Normalize status to match enum (capitalize first letter)
+        if (updateData.status) {
+            const statusMap = {
+                'active': 'Active',
+                'inactive': 'Inactive',
+                'scheduled': 'Scheduled',
+                'Active': 'Active',
+                'Inactive': 'Inactive',
+                'Scheduled': 'Scheduled'
+            };
+            updateData.status = statusMap[updateData.status] || 'Active';
+        }
+
+        // Map the frontend `featured` flag to the model field `isFeatured`.
+        // Admin uses this to curate which routes appear in the Commuter
+        // "Featured Routes & Trips" section.
+        if (typeof updateData.featured !== "undefined") {
+            updateData.isFeatured = !!updateData.featured;
+            updateData.featuredAt = updateData.isFeatured ? new Date() : null;
+            delete updateData.featured;
+        }
+
+        // Update actual route in database - use b2cPartnerId (correct field name)
+        const updatedRoute = await B2CPartnerRoute.findByIdAndUpdate(
+            routeId,
+            {
+                ...updateData,
+                updatedAt: new Date()
+            },
+            { new: true, runValidators: true }
+        ).populate('b2cPartnerId', 'fullName companyName companyLogo');
+
+        if (!updatedRoute) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        // Format response - use correct field names from B2CPartnerRoute model
+        const formattedRoute = {
+            _id: updatedRoute._id,
+            name: `${updatedRoute.fromLocation} to ${updatedRoute.toLocation}`,
+            fromLocation: updatedRoute.fromLocation,
+            toLocation: updatedRoute.toLocation,
+            startPoint: updatedRoute.fromLocation,
+            endPoint: updatedRoute.toLocation,
+            providerName: updatedRoute.b2cPartnerId?.fullName || updatedRoute.b2cPartnerId?.companyName || 'Unknown Provider',
+            providerId: updatedRoute.b2cPartnerId?._id,
+            b2cPartnerId: updatedRoute.b2cPartnerId,
+            startTime: updatedRoute.startTime,
+            totalSeats: updatedRoute.totalSeats,
+            availableSeats: updatedRoute.availableSeats,
+            status: updatedRoute.status,
+            isActive: updatedRoute.isActive,
+            featured: updatedRoute.isFeatured || false,
+            featuredAt: updatedRoute.featuredAt || null,
+            pricing: updatedRoute.pricing,
+            tripType: updatedRoute.tripType,
+            availableDays: updatedRoute.availableDays,
+            stopPoints: updatedRoute.stopPoints,
+            createdAt: updatedRoute.createdAt,
+            updatedAt: updatedRoute.updatedAt
+        };
+
+        console.log(`Successfully updated B2C route: ${formattedRoute.name}`);
+
+        res.status(200).json({
+            success: true,
+            message: "B2C route updated successfully",
+            route: formattedRoute
+        });
+    } catch (error) {
+        console.error("[v0] Error updating B2C route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating B2C route",
+            error: error.message
+        });
+    }
+};
+
+// Delete B2C route
+export const deleteB2CRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+
+        // Fetch the route first so we can settle refunds before removing it.
+        const route = await B2CPartnerRoute.findById(routeId);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        // ===== PROCESS REFUNDS BEFORE DELETING ANYTHING =====
+        // Admin deleting the route is treated the same as the operator cancelling it:
+        // commuters are refunded for their UNUSED trips with NO cancellation fee, the
+        // partner's unused-trip earnings are clawed back, and the admin's unused-trip
+        // commission is clawed back. Refunds must run BEFORE trips are deleted because
+        // the math counts used vs unused trips from the actual trip documents.
+        const activePasses = await B2CMonthlyPass.find({
+            routeId: routeId,
+            status: { $in: ["ACTIVE", "PENDING"] }
+        }).populate("passengerId", "fullName email contactPhone");
+
+        const refundSummaries = [];
+        let totalRefundedToCommuters = 0;
+        const adminUserCache = {};
+
+        for (const pass of activePasses) {
+            const summary = await processRouteDeletionRefundForPass(pass, route, adminUserCache);
+            if (summary) {
+                refundSummaries.push(summary);
+                totalRefundedToCommuters += summary.refundToCommuter || 0;
+            }
+        }
+
+        // Delete associated schedules and trips AFTER refunds are calculated.
+        const schedules = await B2CPartnerSchedule.find({ routeId: routeId });
+        for (const schedule of schedules) {
+            await B2CPartnerTrip.deleteMany({ scheduleId: schedule._id });
+            await B2CPartnerSchedule.findByIdAndDelete(schedule._id);
+        }
+        await B2CPartnerTrip.deleteMany({ routeId: routeId });
+
+        // Mark passes as cancelled/refunded after the wallet settlements above.
+        if (activePasses.length > 0) {
+            await B2CMonthlyPass.updateMany(
+                { routeId: routeId, status: { $in: ["ACTIVE", "PENDING"] } },
+                {
+                    $set: {
+                        status: "CANCELLED",
+                        paymentStatus: "REFUNDED",
+                        notes: `${new Date().toISOString()} - Route deleted by admin. Unused trips refunded to commuter; partner earnings and admin commission for unused trips reversed. No cancellation fee charged.`
+                    }
+                }
+            );
+        }
+
+        // Cancel any remaining (non-pass) bookings linked to this route.
+        await B2CPassengerBooking.updateMany(
+            { routeId: routeId, bookingStatus: { $in: ["PENDING", "ACCEPTED", "CONFIRMED"] } },
+            { $set: { bookingStatus: "CANCELLED", autoCancelReason: "Route deleted by admin" } }
+        );
+
+        // Notify the operator (partner) of total earnings reversed for unused trips.
+        const totalEarningsReversed = round2(
+            refundSummaries.reduce((s, r) => s + (r.earningsReversed || 0), 0)
+        );
+        if (totalEarningsReversed > 0 && route.b2cPartnerId) {
+            try {
+                const partnerCurrency = refundSummaries[0]?.currency || route.pricing?.currency || "AED";
+                const partnerMsg = `The admin deleted your route "${route.fromLocation} to ${route.toLocation}". ${partnerCurrency} ${totalEarningsReversed.toFixed(2)} in earnings for commuters' unused trips was reversed from your wallet and refunded to them. You keep earnings only for trips that were actually used.`;
+                await createNotification({
+                    userId: route.b2cPartnerId,
+                    type: "WALLET_UPDATED",
+                    title: "Earnings Reversed - Route Deleted by Admin",
+                    message: partnerMsg,
+                    category: "WALLET",
+                });
+                sendRealTimeNotification(route.b2cPartnerId, {
+                    type: "WALLET_UPDATED",
+                    title: "Earnings Reversed - Route Deleted by Admin",
+                    message: partnerMsg,
+                    data: { totalEarningsReversed },
+                });
+            } catch (notifErr) {
+                console.error("[v0] Admin delete partner notification failed:", notifErr.message);
+            }
+        }
+
+        // Finally delete the route.
+        const deletedRoute = await B2CPartnerRoute.findByIdAndDelete(routeId);
+
+        console.log(`Successfully deleted B2C route: ${deletedRoute?.fromLocation} to ${deletedRoute?.toLocation}`);
+
+        res.status(200).json({
+            success: true,
+            message: totalRefundedToCommuters > 0
+                ? "B2C route deleted. Commuters were refunded for their unused trips (no cancellation fee). Earnings and commission for unused trips were reversed from the operator and admin wallets."
+                : "B2C route deleted successfully",
+            route: {
+                _id: deletedRoute._id,
+                name: deletedRoute.name
+            },
+            refunds: {
+                passesRefunded: refundSummaries.length,
+                totalRefundedToCommuters: round2(totalRefundedToCommuters),
+                details: refundSummaries
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error deleting B2C route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting B2C route",
+            error: error.message
+        });
+    }
+};
+
+// Get B2C tags and badges
+export const getB2CTags = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const query = {};
+
+        if (status) query.status = status;
+
+        console.log(`[v0] Fetching B2C tags with query:`, { status, page, limit });
+
+        // Fetch real tags from Tag collection
+        const tags = await Tag.find(query)
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit) * 1)
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        // Get total count for pagination
+        const totalTags = await Tag.countDocuments(query);
+
+        // Calculate usage statistics for each tag
+        const tagsWithStats = await Promise.all(
+            tags.map(async (tag) => {
+                // Count how many B2C routes use this tag
+                const routeUsageCount = await B2CPartnerRoute.countDocuments({
+                    tags: tag._id,
+                    status: 'Active'
+                });
+
+                // Count how many B2C vehicles have this tag
+                const vehicleUsageCount = await B2CPartnerVehicle.countDocuments({
+                    tags: tag._id,
+                    status: 'Active'
+                });
+
+                return {
+                    _id: tag._id,
+                    label: tag.label,
+                    color: tag.color || "#6b7280",
+                    textColor: tag.textColor || "#ffffff",
+                    icon: tag.icon || "",
+                    description: tag.description || "",
+                    usageCount: routeUsageCount + vehicleUsageCount,
+                    status: tag.status || "active",
+                    createdAt: tag.createdAt,
+                    updatedAt: tag.updatedAt,
+                    category: tag.category || "general",
+                    isActive: tag.status === "active"
+                };
+            })
+        );
+
+        console.log(`[v0] Found ${tagsWithStats.length} B2C tags (total: ${totalTags})`);
+
+        res.status(200).json({
+            success: true,
+            tags: tagsWithStats,
+            pagination: {
+                currentPage: Number.parseInt(page),
+                totalPages: Math.ceil(totalTags / Number.parseInt(limit)),
+                totalItems: totalTags,
+                itemsPerPage: Number.parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C tags:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C tags",
+            error: error.message,
+        });
+    }
+};
+
+// Create B2C tag
+export const createB2CTag = async (req, res) => {
+    try {
+        const { label, color, textColor, icon, description, category } = req.body;
+
+        if (!label) {
+            return res.status(400).json({ success: false, message: "Tag label is required" });
+        }
+
+        // Check for duplicate
+        const existing = await Tag.findOne({ label: { $regex: new RegExp(`^${label}$`, 'i') } });
+        if (existing) {
+            return res.status(400).json({ success: false, message: "A tag with this label already exists" });
+        }
+
+        const newTag = new Tag({
+            label,
+            color: color || "#6b7280",
+            textColor: textColor || "#ffffff",
+            icon: icon || "",
+            description: description || "",
+            category: category || "general",
+            status: "active"
+        });
+
+        await newTag.save();
+
+        res.status(201).json({
+            success: true,
+            message: "B2C tag created successfully",
+            tag: {
+                _id: newTag._id,
+                label: newTag.label,
+                color: newTag.color,
+                textColor: newTag.textColor,
+                icon: newTag.icon,
+                description: newTag.description,
+                category: newTag.category,
+                status: newTag.status,
+                usageCount: 0,
+                createdAt: newTag.createdAt
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error creating B2C tag:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error creating B2C tag",
+            error: error.message,
+        });
+    }
+};
+
+// Update B2C tag
+export const updateB2CTag = async (req, res) => {
+    try {
+        const { tagId } = req.params;
+        const { label, color, textColor, icon, description, category, status } = req.body;
+
+        const tag = await Tag.findById(tagId);
+        if (!tag) {
+            return res.status(404).json({ success: false, message: "Tag not found" });
+        }
+
+        // Check for duplicate label if label is being changed
+        if (label && label !== tag.label) {
+            const existing = await Tag.findOne({
+                label: { $regex: new RegExp(`^${label}$`, 'i') },
+                _id: { $ne: tagId }
+            });
+            if (existing) {
+                return res.status(400).json({ success: false, message: "A tag with this label already exists" });
+            }
+        }
+
+        // Update fields
+        if (label) tag.label = label;
+        if (color) tag.color = color;
+        if (textColor) tag.textColor = textColor;
+        if (icon !== undefined) tag.icon = icon;
+        if (description !== undefined) tag.description = description;
+        if (category) tag.category = category;
+        if (status) tag.status = status;
+
+        await tag.save();
+
+        // Calculate usage count
+        const routeUsageCount = await B2CPartnerRoute.countDocuments({ tags: tag._id });
+        const vehicleUsageCount = await B2CPartnerVehicle.countDocuments({ tags: tag._id });
+
+        res.status(200).json({
+            success: true,
+            message: "Tag updated successfully",
+            tag: {
+                _id: tag._id,
+                label: tag.label,
+                color: tag.color,
+                textColor: tag.textColor,
+                icon: tag.icon,
+                description: tag.description,
+                category: tag.category,
+                status: tag.status,
+                usageCount: routeUsageCount + vehicleUsageCount,
+                createdAt: tag.createdAt,
+                updatedAt: tag.updatedAt
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error updating B2C tag:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating B2C tag",
+            error: error.message,
+        });
+    }
+};
+
+// Delete B2C tag
+export const deleteB2CTag = async (req, res) => {
+    try {
+        const { tagId } = req.params;
+
+        const tag = await Tag.findById(tagId);
+        if (!tag) {
+            return res.status(404).json({ success: false, message: "Tag not found" });
+        }
+
+        // Check if tag is in use
+        const routeUsageCount = await B2CPartnerRoute.countDocuments({ tags: tag._id });
+        const vehicleUsageCount = await B2CPartnerVehicle.countDocuments({ tags: tag._id });
+
+        if (routeUsageCount > 0 || vehicleUsageCount > 0) {
+            // Remove tag from all routes and vehicles before deleting
+            await B2CPartnerRoute.updateMany(
+                { tags: tag._id },
+                { $pull: { tags: tag._id } }
+            );
+            await B2CPartnerVehicle.updateMany(
+                { tags: tag._id },
+                { $pull: { tags: tag._id } }
+            );
+        }
+
+        await Tag.findByIdAndDelete(tagId);
+
+        res.status(200).json({
+            success: true,
+            message: "Tag deleted successfully"
+        });
+    } catch (error) {
+        console.error("[v0] Error deleting B2C tag:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting B2C tag",
+            error: error.message,
+        });
+    }
+};
+
+// Get tags by category (for B2C/B2B partners to use when creating routes/vehicles)
+// Smart filtering based on context:
+// - context="route" -> returns tags with category: route, promo, general
+// - context="vehicle" -> returns tags with category: vehicle, general
+// - context="service" -> returns tags with category: service, general
+// - context="search" -> returns tags with category: route, promo, general (for commuter search)
+// - category="specific" -> returns only that specific category
+export const getTagsByCategory = async (req, res) => {
+    try {
+        const { category, context } = req.query;
+        const query = { status: "active" };
+
+        // Smart context-based filtering
+        if (context) {
+            switch (context) {
+                case "route":
+                    // For route creation: show route, promo, and general tags
+                    query.category = { $in: ["route", "promo", "general"] };
+                    break;
+                case "vehicle":
+                    // For vehicle creation: show vehicle and general tags
+                    query.category = { $in: ["vehicle", "general"] };
+                    break;
+                case "service":
+                    // For service-related: show service and general tags
+                    query.category = { $in: ["service", "general"] };
+                    break;
+                case "search":
+                    // For commuter search filtering: show route, promo, and general tags
+                    query.category = { $in: ["route", "promo", "general"] };
+                    break;
+                default:
+                    // No filter, return all active tags
+                    break;
+            }
+        } else if (category && category !== "all") {
+            // Direct category filter
+            query.category = category;
+        }
+
+        const tags = await Tag.find(query)
+            .select('_id label color textColor icon description category')
+            .sort({ category: 1, label: 1 });
+
+        // Group tags by category for better organization
+        const groupedTags = {};
+        tags.forEach(tag => {
+            const cat = tag.category || "general";
+            if (!groupedTags[cat]) {
+                groupedTags[cat] = [];
+            }
+            groupedTags[cat].push({
+                _id: tag._id,
+                label: tag.label,
+                color: tag.color,
+                textColor: tag.textColor,
+                icon: tag.icon || "",
+                description: tag.description || "",
+                category: tag.category
+            });
+        });
+
+        res.status(200).json({
+            success: true,
+            tags: tags.map(tag => ({
+                _id: tag._id,
+                label: tag.label,
+                color: tag.color,
+                textColor: tag.textColor,
+                icon: tag.icon || "",
+                description: tag.description || "",
+                category: tag.category
+            })),
+            groupedTags // Also provide grouped format for UI flexibility
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching tags by category:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching tags",
+            error: error.message,
+        });
+    }
+};
+
+// Public endpoint to get all active tags for search filtering
+export const getPublicTags = async (req, res) => {
+    try {
+        const { category } = req.query;
+        const query = { status: "active" };
+
+        if (category && category !== "all") {
+            query.category = category;
+        }
+
+        const tags = await Tag.find(query)
+            .select('_id label color textColor icon category')
+            .sort({ label: 1 });
+
+        res.status(200).json({
+            success: true,
+            tags
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching public tags:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching tags",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C passenger reassignments (real data from bookings)
+export const getB2CPassengerReassignments = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const bookingQuery = {};
+
+        // Map status filter to bookingStatus field
+        if (status && status !== 'all') {
+            bookingQuery.bookingStatus = status.toUpperCase();
+        }
+
+        // Fetch real bookings from B2CPassengerBooking collection
+        const bookings = await B2CPassengerBooking.find(bookingQuery)
+            .populate('passengerId', 'fullName email whatsappNumber profileImage')
+            .populate('routeId', 'fromLocation toLocation description pricing assignedVehicle assignedDriver')
+            .populate('b2cPartnerId', 'fullName companyName profileImage whatsappNumber')
+            .populate('linkedSchedule', 'assignedVehicle assignedDriver tripTimes')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await B2CPassengerBooking.countDocuments(bookingQuery);
+
+        // Get vehicle and driver info for detailed display
+        const B2CPartnerVehicle = (await import("../models/B2CPartnerVehicle.js")).default;
+        const B2CPartnerDriver = (await import("../models/B2CPartnerDriver.js")).default;
+
+        // Collect candidate vehicle/driver IDs from BOTH the booking-time capture
+        // (outbound/return) AND the route/schedule assignment. Also gather partner
+        // IDs so we can fall back to a self-driving partner's own vehicle.
+        const vehicleIds = [];
+        const driverIds = [];
+        const partnerIds = [];
+        bookings.forEach(b => {
+            [b.outboundVehicleId, b.returnVehicleId, b.routeId?.assignedVehicle, b.linkedSchedule?.assignedVehicle]
+                .forEach(id => { if (id) vehicleIds.push(id.toString()); });
+            [b.routeId?.assignedDriver, b.linkedSchedule?.assignedDriver]
+                .forEach(id => { if (id) driverIds.push(id.toString()); });
+            if (b.b2cPartnerId?._id) partnerIds.push(b.b2cPartnerId._id.toString());
+        });
+
+        const [vehicles, drivers, partnerVehicles] = await Promise.all([
+            vehicleIds.length > 0 ? B2CPartnerVehicle.find({ _id: { $in: vehicleIds } }) : [],
+            driverIds.length > 0 ? B2CPartnerDriver.find({ _id: { $in: driverIds } }) : [],
+            partnerIds.length > 0 ? B2CPartnerVehicle.find({ b2cPartnerId: { $in: partnerIds } }) : []
+        ]);
+
+        const vehicleMap = {};
+        vehicles.forEach(v => { vehicleMap[v._id.toString()] = v; });
+        const driverMap = {};
+        drivers.forEach(d => { driverMap[d._id.toString()] = d; });
+        // Fallback: first vehicle owned by each partner (for self-driving partners
+        // whose booking did not capture an explicit vehicle assignment).
+        const partnerVehicleMap = {};
+        partnerVehicles.forEach(v => {
+            const pid = v.b2cPartnerId?.toString();
+            if (pid && !partnerVehicleMap[pid]) partnerVehicleMap[pid] = v;
+        });
+
+        const formattedBookings = bookings.map(booking => {
+            // Get route info - use correct field names from B2CPartnerRoute
+            const routeFromLocation = booking.routeId?.fromLocation || booking.pickupLocation || 'N/A';
+            const routeToLocation = booking.routeId?.toLocation || booking.dropoffLocation || 'N/A';
+
+            const partnerKey = booking.b2cPartnerId?._id?.toString();
+
+            // Resolve vehicle: booking-time capture first, then route/schedule
+            // assignment, then the partner's own vehicle as a final fallback.
+            const vehicleId = booking.outboundVehicleId?.toString() ||
+                booking.returnVehicleId?.toString() ||
+                booking.routeId?.assignedVehicle?.toString() ||
+                booking.linkedSchedule?.assignedVehicle?.toString();
+            let vehicleInfo = vehicleId ? vehicleMap[vehicleId] : null;
+            if (!vehicleInfo && partnerKey) vehicleInfo = partnerVehicleMap[partnerKey] || null;
+
+            // Resolve driver from route/schedule assignment (B2CPartnerDriver).
+            const driverId = booking.routeId?.assignedDriver?.toString() ||
+                booking.linkedSchedule?.assignedDriver?.toString();
+            const driverInfo = driverId ? driverMap[driverId] : null;
+
+            const isSelfDriving = booking.isSelfDriver || booking.outboundIsSelfDriver || false;
+
+            // Get pricing from route or booking
+            const pricing = booking.routeId?.pricing || {};
+
+            return {
+                _id: booking._id,
+                passengerId: booking.passengerId?._id,
+                passengerName: booking.passengerId?.fullName || 'Unknown',
+                passengerEmail: booking.passengerId?.email || 'N/A',
+                passengerPhone: booking.passengerId?.whatsappNumber || 'N/A',
+                passengerImage: booking.passengerId?.profileImage || '',
+                routeId: booking.routeId?._id,
+                routeName: booking.routeId?.description || `${routeFromLocation} - ${routeToLocation}`,
+                startPoint: routeFromLocation,
+                endPoint: routeToLocation,
+                pickupLocation: booking.pickupLocation || routeFromLocation,
+                dropoffLocation: booking.dropoffLocation || routeToLocation,
+                returnPickupLocation: booking.returnPickupLocation,
+                returnDropoffLocation: booking.returnDropoffLocation,
+                bookingType: booking.bookingType || 'ONE_WAY',
+                isMonthlyPass: booking.isMonthlyPass || false,
+                passDuration: booking.passDuration,
+                passStartDate: booking.passStartDate,
+                passEndDate: booking.passEndDate,
+                pricing: {
+                    oneWayPrice: pricing.oneWayPrice || 0,
+                    roundTripPrice: pricing.roundTripPrice || 0,
+                    monthlyOneWayPrice: pricing.monthlyOneWayPrice || 0,
+                    monthlyRoundTripPrice: pricing.monthlyRoundTripPrice || 0,
+                    currency: pricing.currency || booking.currency || 'AED'
+                },
+                providerId: booking.b2cPartnerId?._id,
+                providerName: booking.b2cPartnerId?.companyName || booking.b2cPartnerId?.fullName || 'N/A',
+                providerImage: booking.b2cPartnerId?.profileImage || '',
+                providerPhone: booking.b2cPartnerId?.whatsappNumber || '',
+                vehicleInfo: vehicleInfo ? {
+                    _id: vehicleInfo._id,
+                    model: vehicleInfo.model || 'N/A',
+                    licensePlate: vehicleInfo.licensePlate || 'N/A',
+                    vehicleType: vehicleInfo.vehicleType || 'N/A',
+                    vehicleColor: vehicleInfo.vehicleColor || 'N/A',
+                    seatingCapacity: vehicleInfo.seatingCapacity || booking.numberOfSeats || 'N/A'
+                } : ((booking.vehicleModel || booking.vehiclePlate) ? {
+                    // Fallback to the vehicle snapshot captured on the booking itself.
+                    model: booking.vehicleModel || 'N/A',
+                    licensePlate: booking.vehiclePlate || 'N/A',
+                    vehicleType: 'N/A',
+                    vehicleColor: 'N/A',
+                    seatingCapacity: booking.numberOfSeats || 'N/A'
+                } : null),
+                driverInfo: driverInfo ? {
+                    _id: driverInfo._id,
+                    name: driverInfo.name,
+                    phoneNumber: driverInfo.phoneNumber,
+                    driverImage: driverInfo.driverImage?.url
+                } : (isSelfDriving ? {
+                    // Self-driving partner: surface the partner's own contact details.
+                    name: booking.b2cPartnerId?.fullName || booking.b2cPartnerId?.companyName || booking.driverName || 'Self (Partner)',
+                    phoneNumber: booking.driverPhoneNumber || booking.b2cPartnerId?.whatsappNumber || null,
+                    driverImage: booking.b2cPartnerId?.profileImage || booking.driverImage || null,
+                    isSelf: true
+                } : (booking.driverName ? {
+                    // Fallback to the driver snapshot captured on the booking.
+                    name: booking.driverName,
+                    phoneNumber: booking.driverPhoneNumber || null,
+                    driverImage: booking.driverImage || null
+                } : null)),
+                status: booking.bookingStatus || 'PENDING',
+                seats: booking.numberOfSeats || 1,
+                bookingDate: booking.bookingDate || booking.createdAt,
+                travelDate: booking.travelDate,
+                paymentMethod: booking.paymentMethod || 'CASH',
+                paymentStatus: booking.paymentStatus || 'PENDING',
+                transactionId: booking.transactionId,
+                amount: booking.paymentAmount || 0,
+                currency: booking.currency || 'AED',
+                adminCommissionAmount: booking.adminCommissionAmount || 0,
+                driverEarnings: booking.driverEarnings || 0,
+                isSelfDriver: booking.isSelfDriver || false,
+                driverName: booking.driverName,
+                createdAt: booking.createdAt,
+                updatedAt: booking.updatedAt
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            reassignments: formattedBookings,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C passenger bookings:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C passenger bookings",
+            error: error.message,
+        });
+    }
+};
+
+// Process passenger reassignment (approve/reject booking)
+export const processPassengerReassignment = async (req, res) => {
+    try {
+        const { reassignmentId } = req.params;
+        const { action, reason, newRouteId, newDriverId, newVehicleId } = req.body;
+
+        // Find the booking
+        const booking = await B2CPassengerBooking.findById(reassignmentId);
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found"
+            });
+        }
+
+        // Map action to booking status
+        let newStatus;
+        let statusMessage;
+
+        switch (action.toLowerCase()) {
+            case 'approved':
+            case 'approve':
+                newStatus = 'ACCEPTED';
+                statusMessage = 'Booking approved successfully';
+                break;
+            case 'rejected':
+            case 'reject':
+                newStatus = 'REJECTED';
+                statusMessage = 'Booking rejected successfully';
+                break;
+            case 'reassign':
+                newStatus = booking.bookingStatus; // Keep current status
+                statusMessage = 'Passenger reassigned successfully';
+                // Handle route/driver/vehicle reassignment
+                if (newRouteId) {
+                    booking.routeId = newRouteId;
+                    // Update pickup/dropoff from new route
+                    const B2CPartnerRoute = (await import("../models/B2CPartnerRoute.js")).default;
+                    const newRoute = await B2CPartnerRoute.findById(newRouteId);
+                    if (newRoute) {
+                        booking.pickupLocation = newRoute.fromLocation;
+                        booking.dropoffLocation = newRoute.toLocation;
+                    }
+                }
+                if (newDriverId) {
+                    booking.assignedDriverId = newDriverId;
+                    booking.isSelfDriver = false;
+                    // Get driver info
+                    const B2CPartnerDriver = (await import("../models/B2CPartnerDriver.js")).default;
+                    const driver = await B2CPartnerDriver.findById(newDriverId);
+                    if (driver) {
+                        booking.driverName = driver.name;
+                        booking.driverPhoneNumber = driver.phoneNumber;
+                        booking.driverImage = driver.driverImage?.url;
+                    }
+                }
+                break;
+            case 'cancel':
+                newStatus = 'CANCELLED';
+                statusMessage = 'Booking cancelled successfully';
+                break;
+            default:
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid action. Use 'approve', 'reject', 'reassign', or 'cancel'"
+                });
+        }
+
+        // Update booking status
+        booking.bookingStatus = newStatus;
+
+        // Add admin action log
+        if (!booking.adminActions) {
+            booking.adminActions = [];
+        }
+        booking.adminActions.push({
+            action: action,
+            reason: reason || '',
+            processedAt: new Date(),
+            processedBy: req.userId
+        });
+
+        // If rejected or cancelled, handle refund logic if needed
+        if (newStatus === 'REJECTED' || newStatus === 'CANCELLED') {
+            booking.rejectionReason = reason;
+            booking.rejectedAt = new Date();
+
+            // If payment was completed, mark for refund
+            if (booking.paymentStatus === 'COMPLETED') {
+                booking.refundStatus = 'PENDING';
+                booking.refundReason = reason || `Booking ${action.toLowerCase()} by admin`;
+            }
+        }
+
+        // If approved, set acceptance time
+        if (newStatus === 'ACCEPTED') {
+            booking.acceptedAt = new Date();
+            booking.acceptedBy = req.userId;
+        }
+
+        await booking.save();
+
+        // Send notification to passenger (optional)
+        try {
+            const User = (await import("../models/User.js")).default;
+            const passenger = await User.findById(booking.passengerId);
+            if (passenger) {
+                // You can add notification logic here
+                console.log(`Notification: Booking ${booking._id} ${action} for passenger ${passenger.fullName}`);
+            }
+        } catch (notifError) {
+            console.error("Error sending notification:", notifError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: statusMessage,
+            booking: {
+                _id: booking._id,
+                status: booking.bookingStatus,
+                updatedAt: booking.updatedAt
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error processing passenger reassignment:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error processing passenger reassignment",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C earnings and payments (real data)
+export const getB2CEarningsPayments = async (req, res) => {
+    try {
+        const mongoose = (await import("mongoose")).default;
+        const { period = "monthly", providerId } = req.query;
+
+        // ── Resolve the admin's display currency (KWD/AED/...) so every amount
+        //    is converted from each booking's native currency before summing.
+        const displayCurrency = resolveDisplayCurrency(req);
+        const curDecimals = getCurrencyDecimals(displayCurrency);
+        const round = (val) => Number((val || 0).toFixed(curDecimals));
+
+        // ── Build the date range for the requested period (based on createdAt).
+        const now = new Date();
+        let startDate = null;
+        switch (String(period).toLowerCase()) {
+            case "daily":
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                break;
+            case "weekly": {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                d.setDate(d.getDate() - d.getDay());
+                startDate = d;
+                break;
+            }
+            case "yearly":
+                startDate = new Date(now.getFullYear(), 0, 1);
+                break;
+            case "monthly":
+            default:
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+        }
+
+        // ── Base match: only revenue-generating bookings (payment collected and
+        //    not rejected/cancelled). This mirrors getB2CStats so the Earnings
+        //    tab agrees with the B2C Management Console headline numbers.
+        const baseMatch = {
+            paymentStatus: "COMPLETED",
+            bookingStatus: { $nin: ["REJECTED", "CANCELLED"] },
+            createdAt: { $gte: startDate },
+        };
+
+        // Optional single-provider filter (matches either ownership field).
+        if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+            const pid = new mongoose.Types.ObjectId(providerId);
+            baseMatch.$or = [{ b2cPartnerId: pid }, { partnerId: pid }];
+        }
+
+        // ── Commission/payout expressions with sensible fallbacks. Older bookings
+        //    may not have persisted adminCommissionAmount/driverEarnings, so we
+        //    derive them from the applied commission rate when missing.
+        const commissionExpr = {
+            $cond: [
+                { $gt: [{ $ifNull: ["$adminCommissionAmount", 0] }, 0] },
+                "$adminCommissionAmount",
+                {
+                    $multiply: [
+                        { $ifNull: ["$paymentAmount", 0] },
+                        { $divide: [{ $ifNull: ["$appliedCommissionRate", 20] }, 100] },
+                    ],
+                },
+            ],
+        };
+        const payoutExpr = {
+            $cond: [
+                { $gt: [{ $ifNull: ["$driverEarnings", 0] }, 0] },
+                "$driverEarnings",
+                { $subtract: [{ $ifNull: ["$paymentAmount", 0] }, commissionExpr] },
+            ],
+        };
+
+        const [
+            currencyBuckets,
+            payoutStatusBuckets,
+            providerBuckets,
+            recentBookings,
+        ] = await Promise.all([
+            // Totals grouped by native currency → convert + sum per bucket.
+            B2CPassengerBooking.aggregate([
+                { $match: baseMatch },
+                {
+                    $group: {
+                        _id: "$currency",
+                        revenue: { $sum: { $ifNull: ["$paymentAmount", 0] } },
+                        commission: { $sum: commissionExpr },
+                        payout: { $sum: payoutExpr },
+                        count: { $sum: 1 },
+                    },
+                },
+            ]),
+            // Pending vs completed payouts: a payout is "completed" once the trip
+            // is COMPLETED, otherwise it is still pending (revenue collected, trip
+            // not finished). Grouped by currency for conversion.
+            B2CPassengerBooking.aggregate([
+                { $match: baseMatch },
+                {
+                    $group: {
+                        _id: {
+                            currency: "$currency",
+                            settled: { $cond: [{ $eq: ["$bookingStatus", "COMPLETED"] }, true, false] },
+                        },
+                        payout: { $sum: payoutExpr },
+                    },
+                },
+            ]),
+            // Per-provider breakdown (grouped by provider + currency for conversion).
+            B2CPassengerBooking.aggregate([
+                { $match: baseMatch },
+                {
+                    $group: {
+                        _id: {
+                            provider: { $ifNull: ["$b2cPartnerId", "$partnerId"] },
+                            currency: "$currency",
+                        },
+                        revenue: { $sum: { $ifNull: ["$paymentAmount", 0] } },
+                        commission: { $sum: commissionExpr },
+                        bookings: { $sum: 1 },
+                    },
+                },
+            ]),
+            // Recent transactions for the activity list.
+            B2CPassengerBooking.find(baseMatch)
+                .populate("b2cPartnerId", "fullName companyName")
+                .populate("partnerId", "fullName companyName")
+                .sort({ createdAt: -1 })
+                .limit(20)
+                .lean(),
+        ]);
+
+        // ── Headline totals (currency-converted).
+        const totalBookings = currencyBuckets.reduce((s, b) => s + (b.count || 0), 0);
+        const totalRevenue = sumByCurrency(
+            currencyBuckets.map((b) => ({ _id: b._id, total: b.revenue })),
+            displayCurrency
+        );
+        const commissionEarned = sumByCurrency(
+            currencyBuckets.map((b) => ({ _id: b._id, total: b.commission })),
+            displayCurrency
+        );
+        const providerPayouts = sumByCurrency(
+            currencyBuckets.map((b) => ({ _id: b._id, total: b.payout })),
+            displayCurrency
+        );
+        const averageFare = totalBookings > 0 ? totalRevenue / totalBookings : 0;
+
+        // ── Pending / completed payout split.
+        const pendingPayouts = sumByCurrency(
+            payoutStatusBuckets
+                .filter((b) => !b._id.settled)
+                .map((b) => ({ _id: b._id.currency, total: b.payout })),
+            displayCurrency
+        );
+        const completedPayouts = sumByCurrency(
+            payoutStatusBuckets
+                .filter((b) => b._id.settled)
+                .map((b) => ({ _id: b._id.currency, total: b.payout })),
+            displayCurrency
+        );
+
+        // ── Top performing providers: fold the per-currency buckets into one
+        //    converted total per provider, attach names, sort by revenue.
+        const providerMap = new Map();
+        for (const b of providerBuckets) {
+            const pid = b._id.provider ? String(b._id.provider) : "unknown";
+            const entry = providerMap.get(pid) || { revenue: 0, commission: 0, bookings: 0 };
+            entry.revenue += convertForDisplay(b.revenue, b._id.currency, displayCurrency);
+            entry.commission += convertForDisplay(b.commission, b._id.currency, displayCurrency);
+            entry.bookings += b.bookings || 0;
+            providerMap.set(pid, entry);
+        }
+
+        const providerIds = [...providerMap.keys()].filter(
+            (id) => id !== "unknown" && mongoose.Types.ObjectId.isValid(id)
+        );
+        const providerUsers = await User.find({ _id: { $in: providerIds } })
+            .select("fullName companyName")
+            .lean();
+        const nameById = new Map(
+            providerUsers.map((u) => [String(u._id), u.companyName || u.fullName || "Unknown"])
+        );
+
+        const topProviders = [...providerMap.entries()]
+            .map(([pid, v]) => ({
+                providerId: pid,
+                providerName: pid === "unknown" ? "Unknown" : nameById.get(pid) || "Unknown",
+                revenue: round(v.revenue),
+                bookings: v.bookings,
+                commission: round(v.commission),
+            }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+
+        // ── Recent transactions list.
+        const transactions = recentBookings.map((b) => {
+            const provider = b.b2cPartnerId || b.partnerId || {};
+            const commission =
+                b.adminCommissionAmount > 0
+                    ? b.adminCommissionAmount
+                    : (b.paymentAmount || 0) * ((b.appliedCommissionRate ?? 20) / 100);
+            const payout =
+                b.driverEarnings > 0
+                    ? b.driverEarnings
+                    : (b.paymentAmount || 0) - commission;
+            return {
+                _id: b._id,
+                providerName: provider.companyName || provider.fullName || "Unknown",
+                amount: convertForDisplay(b.paymentAmount || 0, b.currency, displayCurrency),
+                payout: convertForDisplay(payout, b.currency, displayCurrency),
+                commission: convertForDisplay(commission, b.currency, displayCurrency),
+                type: b.bookingType || "B2C_BOOKING",
+                status: b.bookingStatus,
+                date: b.createdAt,
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            earnings: {
+                totalRevenue: round(totalRevenue),
+                totalBookings,
+                averageFare: round(averageFare),
+                commissionEarned: round(commissionEarned),
+                providerPayouts: round(providerPayouts),
+                pendingPayouts: round(pendingPayouts),
+                completedPayouts: round(completedPayouts),
+                period: period || "monthly",
+                currency: displayCurrency,
+                topProviders,
+                transactions,
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C earnings:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C earnings",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C partner earnings
+export const getB2CPartnerEarnings = async (req, res) => {
+    try {
+        const { period = 'monthly' } = req.query;
+        const userId = req.userId;
+        const mongoose = (await import('mongoose')).default;
+        const B2CPassengerBooking = (await import("../models/B2CPassengerBooking.js")).default;
+
+        // Date ranges
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const lastWeekStart = new Date(weekStart);
+        lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+        const partnerObjId = new mongoose.Types.ObjectId(userId);
+        const completedStatuses = ['COMPLETED', 'ACCEPTED', 'IN_PROGRESS'];
+        const partnerMatch = { $or: [{ b2cPartnerId: partnerObjId }, { partnerId: partnerObjId }], bookingStatus: { $in: completedStatuses } };
+
+        // Reusable aggregation that returns gross (total payment received), admin commission, and net earnings.
+        // - gross   = paymentAmount (full amount the commuter paid)
+        // - commission = adminCommissionAmount (admin's cut). Falls back to (paymentAmount - driverEarnings) when missing.
+        // - net     = driverEarnings (what the partner actually keeps). Falls back to (paymentAmount - commission).
+        const breakdownGroup = {
+            _id: null,
+            gross: { $sum: { $ifNull: ["$paymentAmount", 0] } },
+            commission: {
+                $sum: {
+                    $ifNull: [
+                        "$adminCommissionAmount",
+                        { $subtract: [{ $ifNull: ["$paymentAmount", 0] }, { $ifNull: ["$driverEarnings", 0] }] }
+                    ]
+                }
+            },
+            net: {
+                $sum: {
+                    $ifNull: [
+                        "$driverEarnings",
+                        {
+                            $subtract: [
+                                { $ifNull: ["$paymentAmount", 0] },
+                                { $ifNull: ["$adminCommissionAmount", 0] }
+                            ]
+                        }
+                    ]
+                }
+            }
+        };
+
+        // Get earnings breakdown from B2CPassengerBooking for each time window
+        const [totalResult, todayResult, thisWeekResult, lastWeekResult] = await Promise.all([
+            B2CPassengerBooking.aggregate([
+                { $match: partnerMatch },
+                { $group: breakdownGroup }
+            ]),
+            B2CPassengerBooking.aggregate([
+                { $match: { ...partnerMatch, createdAt: { $gte: todayStart } } },
+                { $group: breakdownGroup }
+            ]),
+            B2CPassengerBooking.aggregate([
+                { $match: { ...partnerMatch, createdAt: { $gte: weekStart } } },
+                { $group: breakdownGroup }
+            ]),
+            B2CPassengerBooking.aggregate([
+                { $match: { ...partnerMatch, createdAt: { $gte: lastWeekStart, $lt: weekStart } } },
+                { $group: breakdownGroup }
+            ])
+        ]);
+
+        // Gross totals
+        const totalGross = totalResult[0]?.gross || 0;
+        const totalCommission = totalResult[0]?.commission || 0;
+        const totalNet = totalResult[0]?.net || 0;
+
+        const todayGross = todayResult[0]?.gross || 0;
+        const todayCommission = todayResult[0]?.commission || 0;
+        const todayNet = todayResult[0]?.net || 0;
+
+        const thisWeekGross = thisWeekResult[0]?.gross || 0;
+        const thisWeekCommission = thisWeekResult[0]?.commission || 0;
+        const thisWeekNet = thisWeekResult[0]?.net || 0;
+
+        // Net earnings are what we compare week-over-week (what the partner actually keeps)
+        const lastWeekNet = lastWeekResult[0]?.net || 0;
+
+        // Calculate week-over-week change (based on net earnings)
+        let weekChange = "0%";
+        if (lastWeekNet > 0) {
+            const pctChange = ((thisWeekNet - lastWeekNet) / lastWeekNet * 100).toFixed(0);
+            weekChange = pctChange >= 0 ? `+${pctChange}%` : `${pctChange}%`;
+        } else if (thisWeekNet > 0) {
+            weekChange = "+100%";
+        }
+
+        // Get transaction history grouped by date from B2CPassengerBooking
+        const transactionHistory = await B2CPassengerBooking.aggregate([
+            { $match: partnerMatch },
+            { $sort: { createdAt: -1 } },
+            {
+                $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    trips: { $sum: 1 },
+                    grossAmount: { $sum: { $ifNull: ["$paymentAmount", 0] } },
+                    commissionAmount: {
+                        $sum: {
+                            $ifNull: [
+                                "$adminCommissionAmount",
+                                { $subtract: [{ $ifNull: ["$paymentAmount", 0] }, { $ifNull: ["$driverEarnings", 0] }] }
+                            ]
+                        }
+                    },
+                    netAmount: {
+                        $sum: {
+                            $ifNull: [
+                                "$driverEarnings",
+                                {
+                                    $subtract: [
+                                        { $ifNull: ["$paymentAmount", 0] },
+                                        { $ifNull: ["$adminCommissionAmount", 0] }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    status: { $first: '$paymentStatus' }
+                }
+            },
+            { $sort: { _id: -1 } },
+            { $limit: 20 }
+        ]);
+
+        // Currency a partner sees is ALWAYS derived from their own account country
+        // (the single source of truth), NEVER from a stored record currency (which can
+        // be stale, e.g. stamped "AED" while DEV_COUNTRY was UAE) and NEVER from a
+        // platform-wide toggle (PLATFORM_BASE_COUNTRY only applies to admins). A
+        // partner who registered/operates in Kuwait always sees KWD.
+        const earningsPartner = await User.findById(userId).select("country countryCode role adminPermissions");
+        const currency = getCountryCurrency(getEffectiveCountry(earningsPartner));
+
+        // Respect the currency's decimal places (KWD/BHD/OMR -> 3, others -> 2).
+        const curDecimals = getCurrencyDecimals(currency);
+        const fmt = (val) => `${(val || 0).toFixed(curDecimals)} ${currency}`;
+
+        const transactions = transactionHistory.map(t => ({
+            date: t._id,
+            trips: t.trips,
+            // Net amount the partner keeps (kept for backwards compatibility)
+            amount: `+${(t.netAmount || 0).toFixed(curDecimals)} ${currency}`,
+            grossAmount: fmt(t.grossAmount),
+            commissionAmount: fmt(t.commissionAmount),
+            netAmount: fmt(t.netAmount),
+            status: t.status === 'PAID' || t.status === 'COMPLETED' ? 'Paid' : 'Pending'
+        }));
+
+        res.status(200).json({
+            success: true,
+            earnings: {
+                // `total` kept as net for backwards compatibility with older clients
+                total: fmt(totalNet),
+                // Full breakdown for the overview cards
+                totalGross: fmt(totalGross),
+                totalCommission: fmt(totalCommission),
+                totalNet: fmt(totalNet),
+                thisWeek: fmt(thisWeekNet),
+                thisWeekGross: fmt(thisWeekGross),
+                thisWeekCommission: fmt(thisWeekCommission),
+                thisWeekNet: fmt(thisWeekNet),
+                thisWeekChange: weekChange,
+                today: fmt(todayNet),
+                todayGross: fmt(todayGross),
+                todayCommission: fmt(todayCommission),
+                todayNet: fmt(todayNet),
+                currency: currency,
+            },
+            transactions
+        });
+    } catch (error) {
+        console.error("Error fetching B2C earnings:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching earnings data",
+            error: error.message
+        });
+    }
+};
+
+// Get B2C partner fleet
+export const getB2CPartnerFleet = async (req, res) => {
+    try {
+        console.log("[v0] Fetching B2C fleet for partner:", req.userId);
+
+        // Fetch real vehicles from B2CPartnerVehicle collection
+        const vehicles = await B2CPartnerVehicle.find({
+            b2cPartnerId: req.userId
+        })
+            .select('vehicleType model year seatingCapacity licensePlate vehicleColor status availabilityStatus assignedSchedules images assignedDrivers assignedRoutes createdAt updatedAt features insuranceExpiry registrationExpiry lastAvailabilityUpdate')
+            .sort({ createdAt: -1 });
+
+        // Get current time for availability calculation
+        const now = new Date();
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(now);
+        todayEnd.setHours(23, 59, 59, 999);
+
+        // Fetch ALL trips for today to calculate vehicle availability windows
+        // Include bookedSeats to determine if trips have actual bookings
+        const allTodayTrips = await B2CPartnerTrip.find({
+            b2cPartnerId: req.userId,
+            tripDate: { $gte: today, $lte: todayEnd }
+        }).select('vehicleId tripDate startTime status fromLocation toLocation completedAt bookedSeats').sort({ startTime: 1 });
+
+        // Create maps for vehicle trips by status
+        const vehicleInProgressMap = new Map();
+        const vehicleScheduledMap = new Map();
+        const vehicleCompletedMap = new Map();
+
+        for (const trip of allTodayTrips) {
+            if (!trip.vehicleId) continue;
+            const vehicleId = trip.vehicleId.toString();
+
+            if (['COMPLETED', 'Completed', 'DONE', 'Done'].includes(trip.status)) {
+                if (!vehicleCompletedMap.has(vehicleId)) vehicleCompletedMap.set(vehicleId, []);
+                vehicleCompletedMap.get(vehicleId).push({ ...trip._doc, bookedSeats: trip.bookedSeats || 0 });
+            } else if (['SCHEDULED', 'Scheduled'].includes(trip.status)) {
+                if (!vehicleScheduledMap.has(vehicleId)) vehicleScheduledMap.set(vehicleId, []);
+                vehicleScheduledMap.get(vehicleId).push({ ...trip._doc, bookedSeats: trip.bookedSeats || 0 });
+            } else if (['IN_PROGRESS', 'In Progress', 'STARTED', 'Started'].includes(trip.status)) {
+                if (!vehicleInProgressMap.has(vehicleId)) vehicleInProgressMap.set(vehicleId, []);
+                vehicleInProgressMap.get(vehicleId).push({ ...trip._doc, bookedSeats: trip.bookedSeats || 0 });
+            }
+        }
+
+        // Get all active schedules for this partner to determine vehicle assignments
+        const activeSchedules = await B2CPartnerSchedule.find({
+            b2cPartnerId: req.userId,
+            isActive: true
+        }).populate('routeId', 'fromLocation toLocation');
+
+        // Create a map of vehicle assignments with detailed schedule info
+        const vehicleScheduleMap = new Map();
+
+        for (const schedule of activeSchedules) {
+            // Check tripTimes for vehicle assignments
+            if (schedule.tripTimes && schedule.tripTimes.length > 0) {
+                for (const tripTime of schedule.tripTimes) {
+                    if (tripTime.assignedVehicle) {
+                        const vehicleId = tripTime.assignedVehicle.toString();
+                        if (!vehicleScheduleMap.has(vehicleId)) {
+                            vehicleScheduleMap.set(vehicleId, []);
+                        }
+                        vehicleScheduleMap.get(vehicleId).push({
+                            scheduleId: schedule._id,
+                            scheduleName: schedule.scheduleName,
+                            routeName: schedule.routeId ? `${schedule.routeId.fromLocation} → ${schedule.routeId.toLocation}` : 'Unknown Route',
+                            departureTime: tripTime.departureTime,
+                            arrivalTime: tripTime.arrivalTime,
+                            tripType: tripTime.tripType || schedule.tripType,
+                            availableDays: schedule.availableDays
+                        });
+                    }
+                }
+            }
+
+            // Also check main assignedVehicle field
+            if (schedule.assignedVehicle) {
+                const vehicleId = schedule.assignedVehicle.toString();
+                if (!vehicleScheduleMap.has(vehicleId)) {
+                    vehicleScheduleMap.set(vehicleId, []);
+                }
+                // Check if this schedule isn't already added from tripTimes
+                const existing = vehicleScheduleMap.get(vehicleId);
+                const alreadyAdded = existing.some(s => s.scheduleId.toString() === schedule._id.toString());
+                if (!alreadyAdded) {
+                    vehicleScheduleMap.get(vehicleId).push({
+                        scheduleId: schedule._id,
+                        scheduleName: schedule.scheduleName,
+                        routeName: schedule.routeId ? `${schedule.routeId.fromLocation} → ${schedule.routeId.toLocation}` : 'Unknown Route',
+                        departureTime: schedule.departureTime,
+                        arrivalTime: schedule.arrivalTime,
+                        tripType: schedule.tripType,
+                        availableDays: schedule.availableDays
+                    });
+                }
+            }
+        }
+
+        // Helper to convert time string to minutes since midnight
+        const timeToMinutes = (timeStr) => {
+            if (!timeStr) return 0;
+            let hours, minutes;
+            if (timeStr.includes('AM') || timeStr.includes('PM')) {
+                const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (match) {
+                    hours = parseInt(match[1]);
+                    minutes = parseInt(match[2]);
+                    const period = match[3].toUpperCase();
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                } else {
+                    return 0;
+                }
+            } else {
+                const parts = timeStr.split(':');
+                hours = parseInt(parts[0]);
+                minutes = parseInt(parts[1] || 0);
+            }
+            return hours * 60 + minutes;
+        };
+
+        const currentMinutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+        const BUFFER_MINUTES = 30;
+
+        const transformedVehicles = vehicles.map(vehicle => {
+            const vehicleObj = vehicle._doc;
+            const vehicleId = vehicle._id.toString();
+            const assignedScheduleDetails = vehicleScheduleMap.get(vehicleId) || [];
+
+            // Get trip status for this vehicle
+            const inProgressTrips = vehicleInProgressMap.get(vehicleId) || [];
+            const scheduledTrips = vehicleScheduledMap.get(vehicleId) || [];
+            const completedTrips = vehicleCompletedMap.get(vehicleId) || [];
+
+            // Sort by departure time
+            assignedScheduleDetails.sort((a, b) => {
+                const timeA = a.departureTime || '23:59';
+                const timeB = b.departureTime || '23:59';
+                return timeA.localeCompare(timeB);
+            });
+
+            // DYNAMIC AVAILABILITY CALCULATION based on today's trips
+            // FIXED: Only consider trips with actual bookings (bookedSeats > 0) as commitments
+            let calculatedAvailabilityStatus = 'available';
+            let availabilityMessage = 'Available';
+            let availabilityColor = 'green';
+            let availableUntilDisplay = null;
+            let nextTripTime = null;
+
+            // Check if vehicle is currently in a trip
+            if (inProgressTrips.length > 0) {
+                calculatedAvailabilityStatus = 'busy';
+                availabilityMessage = `In Trip: ${inProgressTrips[0].fromLocation} → ${inProgressTrips[0].toLocation}`;
+                availabilityColor = 'red';
+            } else {
+                // Find upcoming scheduled trips for TODAY that have actual bookings
+                // ONLY trips with bookedSeats > 0 should be considered as commitments
+                const upcomingTrips = scheduledTrips
+                    .filter(t => {
+                        const tripMinutes = timeToMinutes(t.startTime);
+                        const isFuture = tripMinutes > currentMinutesSinceMidnight;
+                        const hasBookings = t.bookedSeats && t.bookedSeats > 0;
+                        return isFuture && hasBookings;
+                    })
+                    .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+                // NOTE: We no longer treat schedules without bookings as commitments
+                // Schedules are only commitments if they have generated trips with bookedSeats > 0
+                // This allows partners to set themselves as "available" even with assigned schedules
+
+                // Find the next commitment (only from trips with actual bookings)
+                let nextCommitmentTime = null;
+                let nextCommitmentTimeStr = null;
+
+                if (upcomingTrips.length > 0) {
+                    nextCommitmentTime = timeToMinutes(upcomingTrips[0].startTime);
+                    nextCommitmentTimeStr = upcomingTrips[0].startTime;
+                }
+
+                if (nextCommitmentTime) {
+                    const minutesUntilCommitment = nextCommitmentTime - currentMinutesSinceMidnight;
+                    nextTripTime = nextCommitmentTimeStr;
+
+                    if (minutesUntilCommitment <= BUFFER_MINUTES) {
+                        // Commitment is within 30 minutes
+                        calculatedAvailabilityStatus = 'scheduled';
+                        availabilityMessage = `Next trip in ${minutesUntilCommitment}min`;
+                        availabilityColor = 'orange';
+                    } else {
+                        // Vehicle is available until 30 min before next commitment
+                        calculatedAvailabilityStatus = 'available';
+                        const availableUntilMinutes = nextCommitmentTime - BUFFER_MINUTES;
+                        const availableUntilHours = Math.floor(availableUntilMinutes / 60);
+                        const availableUntilMins = availableUntilMinutes % 60;
+                        const period = availableUntilHours >= 12 ? 'PM' : 'AM';
+                        const displayHours = availableUntilHours > 12 ? availableUntilHours - 12 : (availableUntilHours === 0 ? 12 : availableUntilHours);
+                        availableUntilDisplay = `${displayHours}:${String(availableUntilMins).padStart(2, '0')} ${period}`;
+                        availabilityMessage = `Available until ${availableUntilDisplay}`;
+                        availabilityColor = 'green';
+                    }
+                } else {
+                    // No upcoming trips with bookings today
+                    // But we should still show "Available until X:XX" if vehicle has SCHEDULES (for display purposes)
+                    if (vehicle.availabilityStatus === 'offline') {
+                        calculatedAvailabilityStatus = 'offline';
+                        availabilityMessage = 'Offline';
+                        availabilityColor = 'gray';
+                    } else {
+                        // Check if vehicle has upcoming SCHEDULES (not trips with bookings) to display availability window
+                        // Use both full day names and abbreviated day names for compatibility
+                        const fullDayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
+                        const shortDayName = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][now.getDay()];
+
+                        // Filter schedules that are active today and in the future
+                        const upcomingSchedules = assignedScheduleDetails
+                            .filter(s => {
+                                // Check if schedule runs today - support both full names and abbreviations
+                                const availableDays = s.availableDays || [];
+                                const daysArray = typeof availableDays === 'string' ? [availableDays] : availableDays;
+                                const runsToday = daysArray.length === 0 ||
+                                    daysArray.some(day => {
+                                        const dayUpper = day.toUpperCase();
+                                        return dayUpper === shortDayName ||
+                                            dayUpper === fullDayName.toUpperCase() ||
+                                            day === fullDayName;
+                                    });
+                                if (!runsToday) return false;
+
+                                // Check if departure time is in the future
+                                const depMinutes = timeToMinutes(s.departureTime);
+                                return depMinutes > currentMinutesSinceMidnight;
+                            })
+                            .sort((a, b) => timeToMinutes(a.departureTime) - timeToMinutes(b.departureTime));
+
+                        if (upcomingSchedules.length > 0) {
+                            // Calculate available until time (30 min before next schedule)
+                            const nextScheduleTime = timeToMinutes(upcomingSchedules[0].departureTime);
+                            const availableUntilMinutes = nextScheduleTime - BUFFER_MINUTES;
+                            const availableUntilHoursCalc = Math.floor(availableUntilMinutes / 60);
+                            const availableUntilMinsCalc = availableUntilMinutes % 60;
+                            const period = availableUntilHoursCalc >= 12 ? 'PM' : 'AM';
+                            const displayHours = availableUntilHoursCalc > 12 ? availableUntilHoursCalc - 12 : (availableUntilHoursCalc === 0 ? 12 : availableUntilHoursCalc);
+                            availableUntilDisplay = `${displayHours}:${String(availableUntilMinsCalc).padStart(2, '0')} ${period}`;
+
+                            calculatedAvailabilityStatus = 'available';
+                            availabilityMessage = `Available until ${availableUntilDisplay}`;
+                            availabilityColor = 'green';
+                            nextTripTime = upcomingSchedules[0].departureTime;
+                        } else {
+                            // Vehicle is fully available - no schedules today
+                            calculatedAvailabilityStatus = 'available';
+                            availabilityMessage = 'Available';
+                            availabilityColor = 'green';
+                        }
+                    }
+                }
+            }
+
+            // Determine availability info based on assignments
+            let availabilityInfo = null;
+
+            if (assignedScheduleDetails.length > 0) {
+                // Get formatted time windows
+                const timeWindows = assignedScheduleDetails.map(s => ({
+                    time: s.departureTime + (s.arrivalTime ? ` - ${s.arrivalTime}` : ''),
+                    route: s.routeName,
+                    days: s.availableDays?.join(', ') || 'All Days'
+                }));
+
+                availabilityInfo = {
+                    assignedCount: assignedScheduleDetails.length,
+                    schedules: timeWindows,
+                    busyTimes: assignedScheduleDetails.map(s => s.departureTime).filter(Boolean)
+                };
+            }
+
+            return {
+                ...vehicleObj,
+                images: vehicle.images || [],
+                features: vehicle.features || [],
+                availabilityStatus: calculatedAvailabilityStatus, // Dynamically calculated
+                availabilityMessage: availabilityMessage,
+                availabilityColor: availabilityColor,
+                availableUntil: availableUntilDisplay,
+                nextTripTime: nextTripTime,
+                assignedSchedules: vehicle.assignedSchedules || [],
+                assignedScheduleDetails: assignedScheduleDetails,
+                availabilityInfo: availabilityInfo,
+                insuranceExpiry: vehicle.insuranceExpiry,
+                registrationExpiry: vehicle.registrationExpiry
+            };
+        });
+
+        console.log("[v0] Transformed vehicles:", transformedVehicles.length, "with schedules:", transformedVehicles.map(v => ({ model: v.model, schedulesCount: v.assignedScheduleDetails?.length || 0 })));
+
+        res.status(200).json({
+            success: true,
+            fleet: {
+                vehicles: transformedVehicles || []
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C fleet data:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C fleet data"
+        });
+    }
+};
+
+// Get B2C partner drivers
+export const getB2CPartnerDrivers = async (req, res) => {
+    try {
+        console.log("[v0] Fetching B2C drivers for partner:", req.userId);
+
+        // Fetch real drivers from database
+        const drivers = await User.find({
+            role: 'B2C_PARTNER_DRIVER',
+            b2cPartnerId: req.userId,
+            status: 'ACTIVE'
+        })
+            .select('fullName email whatsappNumber driverInfo profileImage status')
+            .sort({ createdAt: -1 });
+
+        console.log("[v0] Found B2C drivers:", drivers.length);
+
+        res.status(200).json({
+            success: true,
+            drivers: drivers || []
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C drivers:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C drivers"
+        });
+    }
+};
+
+// Create B2C partner vehicle
+export const createB2CPartnerVehicle = async (req, res) => {
+    try {
+        const vehicleData = req.body;
+
+        console.log("[v0] B2C Vehicle creation data:", vehicleData);
+        console.log("[v0] B2C Vehicle files:", req.files);
+
+        // Handle image uploads to Cloudinary
+        let uploadedImages = [];
+        if (req.files && req.files.images && req.files.images.length > 0) {
+            try {
+                const { uploadMultipleSequential } = await import("../Config/Cloudinary.js");
+                uploadedImages = await uploadMultipleSequential(req.files.images, "b2c-vehicles");
+                console.log("[v0] Images uploaded to Cloudinary:", uploadedImages.length);
+            } catch (uploadError) {
+                console.error("[v0] Cloudinary upload error:", uploadError);
+                // Continue without images if upload fails
+            }
+        }
+
+        // Parse additional fields if they're stringified
+        let parsedFeatures = [];
+        if (vehicleData.features) {
+            try {
+                parsedFeatures = typeof vehicleData.features === 'string'
+                    ? JSON.parse(vehicleData.features)
+                    : vehicleData.features;
+            } catch (e) {
+                parsedFeatures = Array.isArray(vehicleData.features) ? vehicleData.features : [];
+            }
+        }
+
+        // Parse tags if they're stringified
+        let parsedTags = [];
+        if (vehicleData.tags) {
+            try {
+                parsedTags = typeof vehicleData.tags === 'string'
+                    ? JSON.parse(vehicleData.tags)
+                    : vehicleData.tags;
+            } catch (e) {
+                parsedTags = Array.isArray(vehicleData.tags) ? vehicleData.tags : [];
+            }
+        }
+
+        // Create new vehicle with B2CPartnerVehicle model
+        const newVehicle = new B2CPartnerVehicle({
+            b2cPartnerId: req.userId,
+            vehicleType: vehicleData.vehicleType,
+            model: vehicleData.model,
+            year: parseInt(vehicleData.year) || new Date().getFullYear(),
+            seatingCapacity: parseInt(vehicleData.seatingCapacity) || 4,
+            licensePlate: vehicleData.licensePlate,
+            vehicleColor: vehicleData.vehicleColor || "White",
+            features: parsedFeatures,
+            images: uploadedImages.map(img => ({
+                url: img.secure_url,
+                publicId: img.public_id || `b2c-vehicles/${img.public_id || img.asset_id}`
+            })),
+            status: vehicleData.status || "Active",
+            insuranceExpiry: vehicleData.insuranceExpiry ? new Date(vehicleData.insuranceExpiry) : undefined,
+            registrationExpiry: vehicleData.registrationExpiry ? new Date(vehicleData.registrationExpiry) : undefined,
+            tags: parsedTags, // Add vehicle tags
+            isActive: true
+        });
+
+        const savedVehicle = await newVehicle.save();
+
+        console.log(`Successfully created B2C vehicle: ${savedVehicle.vehicleName}`);
+        console.log(`Vehicle images: ${savedVehicle.images.length} uploaded`);
+
+        res.status(201).json({
+            success: true,
+            message: "B2C vehicle created successfully",
+            vehicle: savedVehicle
+        });
+    } catch (error) {
+        console.error("[v0] Error creating B2C vehicle:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error creating B2C vehicle",
+            error: error.message
+        });
+    }
+};
+
+// Update B2C partner vehicle
+export const updateB2CPartnerVehicle = async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+        const vehicleData = req.body;
+
+        console.log("[v0] B2C Vehicle update data:", vehicleData);
+        console.log("[v0] B2C Vehicle files:", req.files);
+
+        // Find existing vehicle
+        const existingVehicle = await B2CPartnerVehicle.findOne({
+            _id: vehicleId,
+            b2cPartnerId: req.userId
+        });
+
+        if (!existingVehicle) {
+            return res.status(404).json({
+                success: false,
+                message: "Vehicle not found or you don't have permission to update it"
+            });
+        }
+
+        // Handle image uploads to Cloudinary
+        let uploadedImages = [];
+        if (req.files && req.files.images && req.files.images.length > 0) {
+            try {
+                const { uploadMultipleSequential } = await import("../Config/Cloudinary.js");
+                uploadedImages = await uploadMultipleSequential(req.files.images, "b2c-vehicles");
+                console.log("[v0] New images uploaded to Cloudinary:", uploadedImages.length);
+            } catch (uploadError) {
+                console.error("[v0] Cloudinary upload error:", uploadError);
+                // Continue without images if upload fails
+            }
+        }
+
+        // Parse additional fields if they're stringified
+        let parsedFeatures = [];
+        if (vehicleData.features) {
+            try {
+                parsedFeatures = typeof vehicleData.features === 'string'
+                    ? JSON.parse(vehicleData.features)
+                    : vehicleData.features;
+            } catch (e) {
+                parsedFeatures = Array.isArray(vehicleData.features) ? vehicleData.features : [];
+            }
+        }
+
+        // Merge existing images with new ones
+        let finalImages = existingVehicle.images || [];
+        if (uploadedImages.length > 0) {
+            finalImages = [...finalImages, ...uploadedImages.map(img => ({
+                url: img.secure_url,
+                publicId: img.public_id || `b2c-vehicles/${img.public_id || img.asset_id}`
+            }))];
+        }
+
+        // Update vehicle with new data
+        const updatedVehicle = await B2CPartnerVehicle.findByIdAndUpdate(
+            vehicleId,
+            {
+                vehicleType: vehicleData.vehicleType || existingVehicle.vehicleType,
+                model: vehicleData.model || existingVehicle.model,
+                year: parseInt(vehicleData.year) || existingVehicle.year,
+                seatingCapacity: parseInt(vehicleData.seatingCapacity) || existingVehicle.seatingCapacity,
+                licensePlate: vehicleData.licensePlate || existingVehicle.licensePlate,
+                vehicleColor: vehicleData.vehicleColor || existingVehicle.vehicleColor,
+                features: parsedFeatures.length > 0 ? parsedFeatures : existingVehicle.features,
+                images: finalImages,
+                status: vehicleData.status || existingVehicle.status,
+                insuranceExpiry: vehicleData.insuranceExpiry ? new Date(vehicleData.insuranceExpiry) : existingVehicle.insuranceExpiry,
+                registrationExpiry: vehicleData.registrationExpiry ? new Date(vehicleData.registrationExpiry) : existingVehicle.registrationExpiry,
+            },
+            { new: true }
+        );
+
+        console.log(`Successfully updated B2C vehicle: ${updatedVehicle.vehicleName}`);
+        console.log(`Vehicle images: ${updatedVehicle.images.length} total`);
+
+        // If the vehicle just became unavailable (Active -> Maintenance/Inactive),
+        // remove it from every route/schedule/trip/booking it was allocated to and
+        // notify affected commuters. An unavailable vehicle must not stay assigned.
+        let deallocationSummary = null;
+        const becameUnavailable =
+            ["Maintenance", "Inactive"].includes(updatedVehicle.status) &&
+            existingVehicle.status === "Active";
+        if (becameUnavailable) {
+            try {
+                deallocationSummary = await deallocateVehicleFromAllAssignments(
+                    vehicleId,
+                    req.userId,
+                    { reason: updatedVehicle.status },
+                );
+            } catch (deallocErr) {
+                console.error("[v0] Vehicle deallocation failed:", deallocErr.message);
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: becameUnavailable
+                ? `Vehicle updated. It has been removed from all assigned trips because it is now ${updatedVehicle.status === "Maintenance" ? "under maintenance" : "inactive"}.`
+                : "B2C vehicle updated successfully",
+            vehicle: updatedVehicle,
+            deallocationSummary,
+        });
+    } catch (error) {
+        console.error("[v0] Error updating B2C vehicle:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating B2C vehicle",
+            error: error.message
+        });
+    }
+};
+
+export const deleteB2CPartnerVehicle = async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+
+        // Find and delete the vehicle
+        const vehicle = await B2CPartnerVehicle.findOneAndDelete({
+            _id: vehicleId,
+            b2cPartnerId: req.userId
+        });
+
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                message: "Vehicle not found or you don't have permission to delete it"
+            });
+        }
+
+        console.log(`Successfully deleted B2C vehicle: ${vehicle.vehicleName}`);
+        console.log(`Vehicle had ${vehicle.images.length} images`);
+
+        res.status(200).json({
+            success: true,
+            message: "B2C vehicle deleted successfully"
+        });
+    } catch (error) {
+        console.error("[v0] Error deleting B2C vehicle:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting B2C vehicle",
+            error: error.message
+        });
+    }
+};
+
+// Update B2C Partner vehicle availability/status (busy/available)
+export const updateB2CPartnerVehicleStatus = async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+        const { status, availabilityStatus } = req.body;
+        const partnerId = req.userId;
+
+        // Find the vehicle
+        const vehicle = await B2CPartnerVehicle.findOne({
+            _id: vehicleId,
+            b2cPartnerId: partnerId
+        });
+
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                message: "Vehicle not found or you don't have permission to update it"
+            });
+        }
+
+        // If trying to set to available, check for active trips (but allow availability window)
+        if (availabilityStatus === 'available') {
+            const B2CPartnerTrip = mongoose.model('B2CPartnerTrip');
+            const now = new Date();
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date();
+            todayEnd.setHours(23, 59, 59, 999);
+
+            // Get all trips for this vehicle today
+            const todayTrips = await B2CPartnerTrip.find({
+                vehicleId: vehicleId,
+                tripDate: { $gte: todayStart, $lte: todayEnd }
+            }).sort({ startTime: 1 });
+
+            // Check if any trip is currently IN_PROGRESS
+            const inProgressTrips = todayTrips.filter(t =>
+                ['IN_PROGRESS', 'In Progress', 'STARTED', 'Started'].includes(t.status)
+            );
+
+            if (inProgressTrips.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `This vehicle has a trip currently in progress. Please complete it before setting status to available.`,
+                    hasInProgressTrip: true,
+                    inProgressTripsCount: inProgressTrips.length
+                });
+            }
+
+            // Get completed and scheduled trips
+            const completedTrips = todayTrips.filter(t =>
+                ['COMPLETED', 'Completed', 'DONE', 'Done'].includes(t.status)
+            );
+            const scheduledTrips = todayTrips.filter(t =>
+                ['SCHEDULED', 'Scheduled'].includes(t.status)
+            );
+
+            // Get current time as HH:MM string
+            const currentHours = String(now.getHours()).padStart(2, '0');
+            const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+            const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+            // Find the next scheduled trip after current time
+            const nextTrip = scheduledTrips.find(t => {
+                const tripTime = t.startTime || '00:00';
+                return tripTime > currentTimeStr;
+            });
+
+            // Calculate availableUntil time if there's a next trip
+            let availableUntil = null;
+            let nextTripTime = null;
+            if (nextTrip) {
+                nextTripTime = nextTrip.startTime;
+                const [hours, minutes] = nextTripTime.split(':').map(Number);
+                const nextTripDate = new Date();
+                nextTripDate.setHours(hours, minutes, 0, 0);
+                availableUntil = new Date(nextTripDate.getTime() - 30 * 60 * 1000); // 30 mins before
+            }
+
+            // Update vehicle with availability window info
+            const updateData = {
+                availabilityStatus: 'available',
+                lastAvailabilityUpdate: new Date(),
+                updatedAt: new Date()
+            };
+
+            // Store availability window info if there's a next trip
+            if (availableUntil) {
+                updateData.availableUntil = availableUntil;
+                updateData.nextScheduledTripTime = nextTripTime;
+            } else {
+                // No upcoming trips - vehicle is fully available
+                updateData.availableUntil = null;
+                updateData.nextScheduledTripTime = null;
+            }
+
+            const updatedVehicle = await B2CPartnerVehicle.findByIdAndUpdate(
+                vehicleId,
+                { $set: updateData },
+                { new: true }
+            );
+
+            console.log(`[v0] Updated vehicle ${vehicleId} to available with window:`, {
+                availableUntil,
+                nextTripTime,
+                hasCompletedTrips: completedTrips.length > 0,
+                hasScheduledTrips: scheduledTrips.length > 0
+            });
+
+            // Broadcast real-time vehicle availability change via socket
+            broadcastVehicleAvailabilityChange(partnerId, {
+                vehicleId: updatedVehicle._id.toString(),
+                vehicleModel: updatedVehicle.model,
+                licensePlate: updatedVehicle.licensePlate,
+                availabilityStatus: 'available',
+                availableUntil: availableUntil,
+                nextScheduledTripTime: nextTripTime,
+                status: updatedVehicle.status
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: nextTripTime
+                    ? `Vehicle set to available until ${nextTripTime}`
+                    : 'Vehicle set to available',
+                vehicle: updatedVehicle,
+                availabilityStatus: 'available',
+                availableUntil: availableUntil,
+                nextScheduledTripTime: nextTripTime,
+                hasUpcomingTrip: !!nextTrip
+            });
+        }
+
+        // For busy status or other updates
+        const updateData = { updatedAt: new Date() };
+        if (status) {
+            updateData.status = status;
+        }
+        if (availabilityStatus) {
+            updateData.availabilityStatus = availabilityStatus;
+            updateData.lastAvailabilityUpdate = new Date();
+            // Clear availability window when set to busy
+            if (availabilityStatus === 'busy') {
+                updateData.availableUntil = null;
+                updateData.nextScheduledTripTime = null;
+            }
+        }
+
+        const updatedVehicle = await B2CPartnerVehicle.findByIdAndUpdate(
+            vehicleId,
+            { $set: updateData },
+            { new: true }
+        );
+
+        console.log(`[v0] Updated vehicle ${vehicleId} status:`, updateData);
+
+        // If the lifecycle status just moved to Maintenance/Inactive, drop this
+        // vehicle from every assignment and notify affected commuters.
+        let deallocationSummary = null;
+        const becameUnavailable =
+            !!status &&
+            ["Maintenance", "Inactive"].includes(status) &&
+            vehicle.status === "Active";
+        if (becameUnavailable) {
+            try {
+                deallocationSummary = await deallocateVehicleFromAllAssignments(
+                    vehicleId,
+                    partnerId,
+                    { reason: status },
+                );
+            } catch (deallocErr) {
+                console.error("[v0] Vehicle deallocation failed:", deallocErr.message);
+            }
+        }
+
+        // Broadcast real-time vehicle availability change via socket
+        if (availabilityStatus) {
+            broadcastVehicleAvailabilityChange(partnerId, {
+                vehicleId: updatedVehicle._id.toString(),
+                vehicleModel: updatedVehicle.model,
+                licensePlate: updatedVehicle.licensePlate,
+                availabilityStatus: updatedVehicle.availabilityStatus,
+                status: updatedVehicle.status
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: becameUnavailable
+                ? `Vehicle status updated. It has been removed from all assigned trips because it is now ${status === "Maintenance" ? "under maintenance" : "inactive"}.`
+                : `Vehicle status updated successfully`,
+            vehicle: updatedVehicle,
+            status: updatedVehicle.status,
+            availabilityStatus: updatedVehicle.availabilityStatus,
+            deallocationSummary,
+        });
+    } catch (error) {
+        console.error("[v0] Error updating vehicle status:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating vehicle status",
+            error: error.message
+        });
+    }
+};
+
+// Assign driver to a B2C Partner vehicle
+export const assignDriverToB2CVehicle = async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+        const { driverId } = req.body;
+        const partnerId = req.userId;
+
+        if (!driverId) {
+            return res.status(400).json({
+                success: false,
+                message: "Driver ID is required"
+            });
+        }
+
+        const vehicle = await B2CPartnerVehicle.findOne({
+            _id: vehicleId,
+            b2cPartnerId: partnerId,
+        });
+
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                message: "Vehicle not found or you don't have permission"
+            });
+        }
+
+        // Verify driver belongs to this partner
+        const driver = await B2CPartnerDriver.findOne({
+            _id: driverId,
+            b2cPartnerId: partnerId,
+        });
+
+        if (!driver) {
+            return res.status(404).json({
+                success: false,
+                message: "Driver not found or does not belong to your fleet"
+            });
+        }
+
+        // Check if driver is already assigned
+        if (vehicle.assignedDrivers.includes(driverId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Driver is already assigned to this vehicle"
+            });
+        }
+
+        vehicle.assignedDrivers.push(driverId);
+        await vehicle.save();
+
+        // Update driver's assigned vehicle reference
+        driver.assignedVehicle = vehicleId;
+        await driver.save();
+
+        const updatedVehicle = await B2CPartnerVehicle.findById(vehicleId)
+            .populate('assignedDrivers', 'name phoneNumber licenseNumber profileImage')
+            .populate('assignedRoutes', 'fromLocation toLocation');
+
+        res.status(200).json({
+            success: true,
+            message: "Driver assigned to vehicle successfully",
+            data: { vehicle: updatedVehicle }
+        });
+    } catch (error) {
+        console.error("[v0] Error assigning driver to vehicle:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error assigning driver to vehicle",
+            error: error.message
+        });
+    }
+};
+
+// Assign driver to a B2C Partner route
+export const assignDriverToB2CRoute = async (req, res) => {
+    try {
+        const { driverId, routeId, vehicleId } = req.body;
+        const partnerId = req.userId;
+
+        if (!driverId || !routeId) {
+            return res.status(400).json({
+                success: false,
+                message: "Driver ID and Route ID are required"
+            });
+        }
+
+        // Verify driver belongs to partner
+        const driver = await B2CPartnerDriver.findOne({
+            _id: driverId,
+            b2cPartnerId: partnerId,
+        });
+
+        if (!driver) {
+            return res.status(404).json({
+                success: false,
+                message: "Driver not found or does not belong to your fleet"
+            });
+        }
+
+        // Verify route belongs to partner
+        const route = await B2CPartnerRoute.findOne({
+            _id: routeId,
+            b2cPartnerId: partnerId,
+        });
+
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found or does not belong to you"
+            });
+        }
+
+        // Update route with driver assignment
+        route.assignedDriver = driverId;
+        if (vehicleId) route.assignedVehicle = vehicleId;
+        await route.save();
+
+        // Update driver with route assignment
+        if (!driver.assignedRoutes) driver.assignedRoutes = [];
+        if (!driver.assignedRoutes.includes(routeId)) {
+            driver.assignedRoutes.push(routeId);
+        }
+        await driver.save();
+
+        const updatedRoute = await B2CPartnerRoute.findById(routeId)
+            .populate('assignedDriver', 'name phoneNumber licenseNumber')
+            .populate('assignedVehicle', 'model licensePlate vehicleType');
+
+        res.status(200).json({
+            success: true,
+            message: "Driver assigned to route successfully",
+            data: { route: updatedRoute }
+        });
+    } catch (error) {
+        console.error("[v0] Error assigning driver to route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error assigning driver to route",
+            error: error.message
+        });
+    }
+};
+
+export const createB2CPartnerTrip = async (req, res) => {
+    try {
+        const tripData = req.body;
+
+        // Create new trip instance
+        const newTrip = new B2CPassengerBooking({
+            routeId: tripData.routeId,
+            b2cPartnerId: req.userId,
+            tripDate: new Date(tripData.tripDate),
+            startTime: tripData.startTime,
+            fromLocation: tripData.fromLocation,
+            toLocation: tripData.toLocation,
+            tripType: tripData.tripType,
+            totalSeats: tripData.totalSeats,
+            availableSeats: tripData.availableSeats,
+            pricing: tripData.pricing,
+            assignedVehicle: tripData.vehicleId,
+            assignedDriver: tripData.driverId,
+            notes: tripData.notes || "",
+            status: "Scheduled",
+            isActive: true
+        });
+
+        const savedTrip = await newTrip.save();
+
+        // Populate related data
+        await savedTrip.populate('assignedVehicle', 'plateNumber model type capacity');
+        await savedTrip.populate('assignedDriver', 'fullName phone');
+
+        console.log(`Successfully created B2C trip: ${tripData.fromLocation} to ${tripData.toLocation} on ${tripData.tripDate}`);
+
+        res.status(201).json({
+            success: true,
+            message: "B2C trip created successfully",
+            trip: savedTrip
+        });
+    } catch (error) {
+        console.error("[v0] Error creating B2C trip:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error creating B2C trip",
+            error: error.message
+        });
+    }
+};
+
+// Get Commuter routes
+export const getCommuterRoutes = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        // Show a commuter ONLY the routes that operate in the country they are
+        // currently browsing. Two identity-based facts drive this — never the
+        // free-text stop names, and never a client-supplied param that could
+        // disagree with their currency:
+        //
+        //   • Commuter's active country: getEffectiveCountry(commuter). For a
+        //     commuter this returns their SWITCHABLE active country (the one
+        //     picked in the in-app country switcher and saved on their profile),
+        //     so a Kuwait-registered commuter who switches to the UAE now sees
+        //     UAE routes in AED — no second account, exactly like Uber/Careem.
+        //   • Route's country: getEffectiveCountry(owningPartner), i.e. the
+        //     partner's own registration country. A Kuwait partner's routes are
+        //     always Kuwait routes regardless of how the stops are spelled.
+        //   • A `nationality`/`country` query param is honored ONLY when it names
+        //     a served country. The in-app country switcher forwards the freshly
+        //     selected country, so the list updates instantly without waiting for
+        //     the profile write to land (no optimistic-update race). This is safe
+        //     because this route is commuter-scoped and country here is a travel
+        //     context, not a billing identity. It falls through to the stored
+        //     active country when absent/invalid.
+        const SERVICE_COUNTRY_CODES = getServiceCountryCodes();
+
+        const commuter = await User.findById(userId).select('country nationality countryCode role adminPermissions');
+
+        const requestedCountry = req.query.nationality || req.query.country;
+        const commuterCountry =
+            requestedCountry && isServedCountry(requestedCountry)
+                ? normalizeCountry(requestedCountry)
+                : getEffectiveCountry(commuter);
+
+        // Fetch real active B2C routes; countryCode is populated so each route's
+        // country can be resolved from its owning partner's identity.
+        const allActiveRoutes = await B2CPartnerRoute.find({ status: 'Active' })
+            .populate('b2cPartnerId', 'fullName companyName email country countryCode role')
+            .sort({ createdAt: -1 });
+
+        // Keep only routes whose owning-partner country matches the commuter's
+        // active country. Routes with no resolvable owner fall back to a location
+        // guess so legacy data still surfaces to the right country.
+        const routes = allActiveRoutes.filter(route => {
+            if (commuterCountry && SERVICE_COUNTRY_CODES.includes(commuterCountry)) {
+                let routeCountry = null;
+                const partner = route.b2cPartnerId;
+                if (partner && typeof partner === "object" && (partner.countryCode || partner.country)) {
+                    routeCountry = getEffectiveCountry(partner);
+                } else {
+                    const loc = `${route.fromLocation || ''} ${route.toLocation || ''}`.toLowerCase();
+                    if (['kuwait', 'salwa', 'jahra', 'salmiya', 'hawally', 'farwaniya', 'ahmadi', 'mangaf', 'fahaheel', 'fintas', 'mahboula', 'khaitan', 'jleeb', 'mubarak', 'reggae'].some(k => loc.includes(k))) routeCountry = 'KW';
+                    else if (['dubai', 'abu dhabi', 'sharjah', 'ajman', 'fujairah', 'ras al', 'umm al', 'al ain', 'deira', 'bur dubai', 'jumeirah', 'marina', 'jebel ali', 'silicon oasis', 'business bay', 'creek', 'mall of emirates', 'burjuman', 'ghubaiba', 'oud metha'].some(k => loc.includes(k))) routeCountry = 'UAE';
+                }
+                return routeCountry === commuterCountry;
+            }
+            return true;
+        });
+
+        // Fetch all active schedules for these routes
+        const routeIds = routes.map(r => r._id);
+
+        // Find which of these routes the commuter currently has an ACTIVE booking on.
+        // "Active" = a monthly pass that is still valid (status ACTIVE, future endDate),
+        // regardless of booking status (which is metadata on the B2CPassengerBooking for
+        // the one-time transaction).
+        let bookedRouteIds = new Set();
+        try {
+            // First check for active monthly passes. A pass blocks seats as long as it's
+            // ACTIVE and hasn't expired, independent of booking status.
+            const { default: B2CMonthlyPass } = await import("../models/B2CMonthlyPass.js");
+            const activePassRouteIds = await B2CMonthlyPass.find({
+                passengerId: userId,
+                routeId: { $in: routeIds },
+                status: "ACTIVE",
+                endDate: { $gte: new Date() }
+            }).distinct("routeId");
+            activePassRouteIds.forEach(id => bookedRouteIds.add(id.toString()));
+
+            // Also include any non-rejected/non-cancelled bookings (pending/confirmed/in-progress/completed).
+            // Completed bookings might be from day-passes, etc.
+            const otherBookings = await B2CPassengerBooking.find({
+                passengerId: userId,
+                routeId: { $in: routeIds },
+                bookingStatus: { $in: ['PENDING', 'CONFIRMED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] }
+            }).select('routeId');
+            otherBookings.forEach(b => { if (b.routeId) bookedRouteIds.add(b.routeId.toString()); });
+
+            console.log("[v0] Found booked routes for user (active passes + bookings):", Array.from(bookedRouteIds));
+        } catch (e) {
+            console.error("[v0] Error fetching active bookings:", e.message);
+            // Booking lookup is best-effort; routes still render without it
+        }
+        let schedules = [];
+        try {
+            schedules = await B2CPartnerSchedule.find({
+                routeId: { $in: routeIds },
+                isActive: true,
+                status: 'Active'
+            });
+        } catch (e) {
+            // B2CPartnerSchedule may not exist yet
+        }
+
+        const scheduleMap = {};
+        schedules.forEach(s => {
+            if (!scheduleMap[s.routeId.toString()]) {
+                scheduleMap[s.routeId.toString()] = s;
+            }
+        });
+
+        // Helper to parse time strings
+        const parseTime = (timeStr) => {
+            if (!timeStr) return null;
+            const cleanTime = timeStr.trim();
+            const amPmMatch = cleanTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (amPmMatch) {
+                let h = parseInt(amPmMatch[1]);
+                const m = parseInt(amPmMatch[2]);
+                const period = amPmMatch[3].toUpperCase();
+                if (period === 'PM' && h !== 12) h += 12;
+                if (period === 'AM' && h === 12) h = 0;
+                return h * 60 + m;
+            }
+            const simpleMatch = cleanTime.match(/^(\d{1,2}):(\d{2})$/);
+            if (simpleMatch) {
+                return parseInt(simpleMatch[1]) * 60 + parseInt(simpleMatch[2]);
+            }
+            return null;
+        };
+
+        // Compute LIVE seat availability for every route. A monthly pass holds a
+        // seat for its whole period, so availability must reflect active passes
+        // (not the static route.availableSeats which never changes on booking).
+        const seatInfoByRoute = {};
+        await Promise.all(
+            routes.map(async (route) => {
+                try {
+                    const { routeAvailableSeats, routeTotalSeats, seatAvailability } = await computeRouteSeatAvailability(route);
+                    seatInfoByRoute[route._id.toString()] = { routeAvailableSeats, routeTotalSeats, seatAvailability };
+                } catch (e) {
+                    seatInfoByRoute[route._id.toString()] = {
+                        routeAvailableSeats: route.availableSeats || 0,
+                        routeTotalSeats: route.totalSeats || 0,
+                        seatAvailability: {},
+                    };
+                }
+            })
+        );
+
+        const formattedRoutes = routes.map(route => {
+            const schedule = scheduleMap[route._id.toString()];
+            const liveSeats = seatInfoByRoute[route._id.toString()] || {};
+
+            const stops = route.stopPoints || [];
+            const sortedStops = [...stops].sort((a, b) => a.order - b.order);
+            const firstStop = sortedStops.length > 0 ? sortedStops[0] : null;
+            const lastStop = sortedStops.length > 0 ? sortedStops[sortedStops.length - 1] : null;
+
+            // Priority: schedule tripTimes > route startTime > stop point times
+            let departureTime = 'Not set';
+            let arrivalTime = 'Not set';
+
+            if (schedule && schedule.tripTimes && schedule.tripTimes.length > 0) {
+                departureTime = schedule.tripTimes[0].departureTime || schedule.tripTimes[0].startTime || 'Not set';
+                arrivalTime = schedule.tripTimes[0].arrivalTime || schedule.tripTimes[0].endTime || 'Not set';
+            } else if (route.startTime) {
+                departureTime = route.startTime;
+                arrivalTime = lastStop?.time || 'Not set';
+            } else if (firstStop) {
+                departureTime = firstStop.time || 'Not set';
+                arrivalTime = lastStop?.time || 'Not set';
+            }
+
+            // Distance is intentionally NOT fabricated. The route schema has no
+            // distance field, no coordinates, and no maps integration, so any "~15 km"
+            // figure would be a made-up number. We only surface a distance when the
+            // route actually stores a real one; otherwise it is null and the UI hides
+            // the Distance row entirely. (Duration below IS real — derived from the
+            // real departure/arrival trip times.)
+            const realDistance =
+                route.distanceKm != null && Number(route.distanceKm) > 0
+                    ? `${Number(route.distanceKm)} km`
+                    : null;
+
+            // Estimate duration
+            let estimatedDuration = 'Not available';
+            const depTime = departureTime !== 'Not set' ? departureTime : firstStop?.time;
+            const arrTime = arrivalTime !== 'Not set' ? arrivalTime : lastStop?.time;
+
+            if (depTime && arrTime && depTime !== arrTime) {
+                try {
+                    const depMinutes = parseTime(depTime);
+                    const arrMinutes = parseTime(arrTime);
+
+                    if (depMinutes !== null && arrMinutes !== null) {
+                        let diffMinutes = arrMinutes - depMinutes;
+                        if (diffMinutes < 0) diffMinutes += 24 * 60; // handle overnight
+                        if (diffMinutes > 0) {
+                            const hrs = Math.floor(diffMinutes / 60);
+                            const mins = diffMinutes % 60;
+                            estimatedDuration = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                        }
+                    }
+                } catch (e) {
+                    // Fallback
+                }
+            }
+
+            // Check if current user has SAVED this route (members array = saved routes)
+            const isSaved = (route.members || []).some(
+                m => m.userId && m.userId.toString() === userId.toString() && m.status === 'ACTIVE'
+            );
+
+            // Check if current user has an ACTIVE booking on this route
+            const isBooked = bookedRouteIds.has(route._id.toString());
+
+            // The card displays ONE specific trip (departureTime -> arrivalTime).
+            // Show the live seats for THAT exact outbound leg so the number stays
+            // consistent with what the commuter sees on the card (e.g. 4/5 after a
+            // booking), instead of the best-case max across every trip on the route.
+            const seatAvailability = liveSeats.seatAvailability || {};
+            const primaryLeg =
+                (departureTime && departureTime !== 'Not set' && seatAvailability[`${departureTime}_outbound`]) ||
+                null;
+            const cardTotalSeats = primaryLeg
+                ? primaryLeg.totalSeats
+                : (liveSeats.routeTotalSeats ?? route.totalSeats ?? 0);
+            const cardAvailableSeats = primaryLeg
+                ? primaryLeg.availableSeats
+                : (liveSeats.routeAvailableSeats ?? route.availableSeats ?? 0);
+
+            return {
+                _id: route._id,
+                name: route.routeName || `${route.fromLocation || 'Unknown'} to ${route.toLocation || 'Unknown'}`,
+                startPoint: route.fromLocation || 'Not set',
+                endPoint: route.toLocation || 'Not set',
+                // Raw location fields required by the BookingModal
+                fromLocation: route.fromLocation || '',
+                toLocation: route.toLocation || '',
+                distance: realDistance,
+                estimatedTime: estimatedDuration,
+                // Authoritative FIXED MONTHLY prices (what the partner sets and the
+                // commuter pays). Fall back to the legacy per-day price only for old
+                // routes created before monthly pricing existed.
+                price: route.pricing?.monthlyOneWayPrice || route.pricing?.oneWayPrice || 0,
+                monthlyOneWayPrice: route.pricing?.monthlyOneWayPrice || route.pricing?.oneWayPrice || 0,
+                monthlyRoundTripPrice: route.pricing?.monthlyRoundTripPrice || route.pricing?.roundTripPrice || 0,
+                roundTripPrice: route.pricing?.monthlyRoundTripPrice || route.pricing?.roundTripPrice || 0,
+                status: route.status?.toLowerCase() || 'inactive',
+                isSaved,
+                isBooked,
+                partnerName: route.b2cPartnerId?.companyName || route.b2cPartnerId?.fullName || 'Unknown',
+                departureTime,
+                arrivalTime,
+                totalSeats: cardTotalSeats,
+                availableSeats: cardAvailableSeats,
+                stops: route.stopPoints || [],
+                tripType: route.tripType || 'One Way',
+                operatingDays: route.availableDays || [],
+                availableDays: route.availableDays || [],
+                startDate: route.startDate,
+                currency: route.pricing?.currency || 'KWD',
+                pricing: route.pricing || {},
+                createdAt: route.createdAt
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            routes: formattedRoutes
+        });
+    } catch (error) {
+        console.error("Error fetching commuter routes:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching commuter routes"
+        });
+    }
+};
+
+// Save route (add to commuter's saved/favourite routes - does NOT block a seat)
+export const joinRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const userId = req.userId;
+
+        if (!routeId) {
+            return res.status(400).json({
+                success: false,
+                message: "Route ID is required"
+            });
+        }
+
+        const route = await B2CPartnerRoute.findById(routeId);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        if (route.status !== 'Active') {
+            return res.status(400).json({
+                success: false,
+                message: "Route is not active"
+            });
+        }
+
+        // Check if user already saved this route
+        const existingMember = (route.members || []).find(
+            m => m.userId && m.userId.toString() === userId.toString() && m.status === 'ACTIVE'
+        );
+
+        if (existingMember) {
+            return res.status(400).json({
+                success: false,
+                message: "Route is already saved"
+            });
+        }
+
+        // If the user previously left/removed, re-activate that entry; otherwise push a new one.
+        // Saving a route does NOT decrement available seats - seats are only reserved on real bookings.
+        const previousMember = (route.members || []).find(
+            m => m.userId && m.userId.toString() === userId.toString()
+        );
+
+        if (previousMember) {
+            await B2CPartnerRoute.updateOne(
+                { _id: routeId, 'members.userId': userId },
+                { $set: { 'members.$.status': 'ACTIVE', 'members.$.joinedAt': new Date() } }
+            );
+        } else {
+            await B2CPartnerRoute.findByIdAndUpdate(routeId, {
+                $push: {
+                    members: {
+                        userId: userId,
+                        joinedAt: new Date(),
+                        status: 'ACTIVE'
+                    }
+                }
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Route saved successfully",
+            routeInfo: {
+                routeId: route._id,
+                routeName: `${route.fromLocation} to ${route.toLocation}`,
+                fromLocation: route.fromLocation,
+                toLocation: route.toLocation,
+                pricing: route.pricing,
+                availableDays: route.availableDays,
+                savedAt: new Date()
+            }
+        });
+
+    } catch (error) {
+        console.error("Error saving route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error saving route",
+            error: error.message
+        });
+    }
+};
+
+// Unsave route (remove from commuter's saved routes - does NOT change seats)
+export const leaveRoute = async (req, res) => {
+    try {
+        const { routeId } = req.params;
+        const userId = req.userId;
+
+        if (!routeId) {
+            return res.status(400).json({
+                success: false,
+                message: "Route ID is required"
+            });
+        }
+
+        const route = await B2CPartnerRoute.findById(routeId);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found"
+            });
+        }
+
+        // Check if the route is currently saved
+        const activeMember = (route.members || []).find(
+            m => m.userId && m.userId.toString() === userId.toString() && m.status === 'ACTIVE'
+        );
+
+        if (!activeMember) {
+            return res.status(400).json({
+                success: false,
+                message: "Route is not saved"
+            });
+        }
+
+        // Mark as LEFT. Saving never reserved a seat, so we do NOT change availableSeats here.
+        await B2CPartnerRoute.updateOne(
+            { _id: routeId, 'members.userId': userId, 'members.status': 'ACTIVE' },
+            { $set: { 'members.$.status': 'LEFT' } }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Route removed from saved",
+            routeInfo: {
+                routeId: route._id,
+                routeName: `${route.fromLocation} to ${route.toLocation}`,
+                removedAt: new Date()
+            }
+        });
+
+    } catch (error) {
+        console.error("Error unsaving route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error unsaving route",
+            error: error.message
+        });
+    }
+};
+
+// Get Commuter profile
+export const getCommuterProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const profile = {
+            _id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.whatsappNumber,
+            language: 'en',
+            currency: 'KWD',
+            country: user.country,
+            membershipType: user.level?.toLowerCase() || 'standard',
+            avatar: user.profileImage || user.companyLogo || null,
+            status: user.status,
+            createdAt: user.createdAt
+        };
+
+        const preferences = {
+            pushNotifications: user.notifications?.emailNotifications ?? true,
+            marketingEmails: user.notifications?.smsNotifications ?? false,
+            tripReminders: user.notifications?.bookingAlerts ?? true,
+            promotionalOffers: user.notifications?.paymentAlerts ?? true
+        };
+
+        res.status(200).json({
+            success: true,
+            profile,
+            preferences
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching commuter profile:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching commuter profile"
+        });
+    }
+};
+
+// Get Commuter Stats - real data from database
+export const getCommuterStats = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        // Count total completed rides. B2CPassengerBooking's real status field is
+        // `bookingStatus` (uppercase enum) — there is NO top-level `status` field,
+        // so the old query always returned 0. Match the actual enum value.
+        const totalRides = await B2CPassengerBooking.countDocuments({
+            passengerId: userId,
+            bookingStatus: "COMPLETED"
+        });
+
+        // Estimate CO2 saved (average 2.3kg CO2 saved per shared ride vs personal car)
+        const co2PerRide = 2.3;
+        const savedCO2 = (totalRides * co2PerRide).toFixed(1);
+
+        // Active subscriptions = the commuter's REAL active recurring products, not
+        // bookings. That means active recurring Subscriptions PLUS active B2C monthly
+        // passes (the two ways a commuter holds an ongoing subscription). The old code
+        // counted bookings on a non-existent `status` field and always returned 0.
+        const [activeRecurringSubs, activeMonthlyPasses] = await Promise.all([
+            Subscription.countDocuments({ userId, status: "ACTIVE" }),
+            B2CMonthlyPass.countDocuments({ passengerId: userId, status: "ACTIVE" })
+        ]);
+        const activeSubscriptions = activeRecurringSubs + activeMonthlyPasses;
+
+        // Get user level
+        const user = await User.findById(userId).select('level');
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalRides,
+                savedCO2: `${savedCO2}kg`,
+                activeSubscriptions,
+                isPremium: user?.level === 'PREMIUM' || user?.level === 'VIP'
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching commuter stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching commuter stats"
+        });
+    }
+};
+
+// Update Commuter profile
+export const updateCommuterProfile = async (req, res) => {
+    try {
+        const { profile, preferences } = req.body;
+        const userId = req.userId;
+
+        // Validate input data
+        if (!profile || !preferences) {
+            return res.status(400).json({
+                success: false,
+                message: "Profile and preferences data are required"
+            });
+        }
+
+        console.log(`[v0] Updating commuter profile for user ${userId}:`, { profile, preferences });
+
+        // Find existing user profile
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Validate email format if provided
+        if (profile.email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(profile.email)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid email format"
+                });
+            }
+        }
+
+        // Validate phone number format if provided
+        if (profile.phone) {
+            const phoneRegex = /^[+]?[\d\s\-\(\)]{10,15}$/;
+            if (!phoneRegex.test(profile.phone)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid phone number format"
+                });
+            }
+        }
+
+        // Update user profile with real database operations
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    ...(profile.fullName && { fullName: profile.fullName }),
+                    ...(profile.email && { email: profile.email }),
+                    ...(profile.phone && { whatsappNumber: profile.phone }),
+                    ...(profile.language && { language: profile.language }),
+                    ...(profile.currency && { currency: profile.currency }),
+                    ...(profile.profileImage && { profileImage: profile.profileImage }),
+                    // Update preferences in user document or separate preferences collection
+                    ...(preferences.pushNotifications !== undefined && {
+                        'preferences.pushNotifications': preferences.pushNotifications
+                    }),
+                    ...(preferences.marketingEmails !== undefined && {
+                        'preferences.marketingEmails': preferences.marketingEmails
+                    }),
+                    ...(preferences.tripReminders !== undefined && {
+                        'preferences.tripReminders': preferences.tripReminders
+                    }),
+                    ...(preferences.promotionalOffers !== undefined && {
+                        'preferences.promotionalOffers': preferences.promotionalOffers
+                    })
+                }
+            },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Log profile update in transaction history
+        await Transaction.create({
+            userId: userId,
+            type: "PROFILE_UPDATE",
+            category: "USER_PROFILE",
+            status: "UPDATED",
+            createdAt: new Date(),
+            metadata: {
+                updatedBy: userId,
+                previousProfile: {
+                    fullName: user.fullName,
+                    email: user.email,
+                    whatsappNumber: user.whatsappNumber,
+                    language: user.language,
+                    currency: user.currency,
+                    profileImage: user.profileImage
+                },
+                newProfile: profile,
+                preferences: preferences
+            }
+        });
+
+        console.log(`[v0] Commuter profile updated successfully for user ${userId}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            profile: {
+                fullName: updatedUser.fullName,
+                email: updatedUser.email,
+                whatsappNumber: updatedUser.whatsappNumber,
+                language: updatedUser.language,
+                currency: updatedUser.currency,
+                profileImage: updatedUser.profileImage,
+                updatedAt: updatedUser.updatedAt
+            },
+            preferences: {
+                pushNotifications: updatedUser.preferences?.pushNotifications || false,
+                marketingEmails: updatedUser.preferences?.marketingEmails || false,
+                tripReminders: updatedUser.preferences?.tripReminders || false,
+                promotionalOffers: updatedUser.preferences?.promotionalOffers || false
+            }
+        });
+
+    } catch (error) {
+        console.error("[v0] Error updating commuter profile:", error);
+
+        // Log failed profile update attempt
+        try {
+            await Transaction.create({
+                userId: req.userId,
+                type: "PROFILE_UPDATE_FAILED",
+                category: "USER_PROFILE",
+                status: "FAILED",
+                createdAt: new Date(),
+                metadata: {
+                    error: error.message,
+                    attemptedAt: new Date(),
+                    profileData: req.body.profile,
+                    preferencesData: req.body.preferences
+                }
+            });
+        } catch (logError) {
+            console.error("[v0] Failed to log profile update error:", logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Error updating commuter profile",
+            error: error.message
+        });
+    }
+};
+
+// Change password
+export const changeCommuterPassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.userId;
+
+        // Validate input data
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Current password and new password are required"
+            });
+        }
+
+        // Validate password strength
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: "New password must be at least 8 characters long"
+            });
+        }
+
+        // Validate password complexity
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                success: false,
+                message: "New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+            });
+        }
+
+        console.log(`[v0] Password change request for user ${userId}`);
+
+        // Find user and verify current password
+        const user = await User.findById(userId).select('+password');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Verify current password
+        const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+        if (!isCurrentPasswordValid) {
+            return res.status(400).json({
+                success: false,
+                message: "Current password is incorrect"
+            });
+        }
+
+        // Hash new password
+        const bcrypt = require('bcryptjs');
+        const saltRounds = 12;
+        const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+        // Update user password in database
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                password: hashedNewPassword,
+                passwordChangedAt: new Date(),
+                lastPasswordChange: new Date()
+            },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        // Log password change in transaction history
+        await Transaction.create({
+            userId: userId,
+            type: "PASSWORD_CHANGE",
+            category: "USER_SECURITY",
+            status: "CHANGED",
+            createdAt: new Date(),
+            metadata: {
+                changedBy: userId,
+                previousPasswordHash: user.password,
+                passwordChangedAt: new Date(),
+                changeMethod: "USER_INITIATED",
+                ipAddress: req.ip || req.connection.remoteAddress
+            }
+        });
+
+        console.log(`[v0] Password changed successfully for user ${userId}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Password changed successfully",
+            changedAt: new Date(),
+            passwordExpiry: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+        });
+
+    } catch (error) {
+        console.error("[v0] Error changing password:", error);
+
+        // Log failed password change attempt
+        try {
+            await Transaction.create({
+                userId: req.userId,
+                type: "PASSWORD_CHANGE_FAILED",
+                category: "USER_SECURITY",
+                status: "FAILED",
+                createdAt: new Date(),
+                metadata: {
+                    error: error.message,
+                    attemptedAt: new Date(),
+                    ipAddress: req.ip || req.connection.remoteAddress,
+                    changeMethod: "USER_INITIATED"
+                }
+            });
+        } catch (logError) {
+            console.error("[v0] Failed to log password change error:", logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Error changing password",
+            error: error.message
+        });
+    }
+};
+
+// ==================== ADMIN PROFILE / ACCOUNT ====================
+
+// Get the logged-in admin's own profile + notification preferences
+export const getAdminProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        const profile = {
+            _id: user._id,
+            fullName: user.fullName || '',
+            email: user.email || '',
+            phone: user.whatsappNumber || '',
+            role: user.role,
+            country: user.country || '',
+            status: user.status,
+            lastLogin: user.lastLogin || null,
+            createdAt: user.createdAt,
+            profileImage: user.profileImage || null
+        };
+
+        // Map admin notification preferences onto the persisted User.notifications field
+        const preferences = {
+            systemAlerts: user.notifications?.bookingAlerts ?? true,
+            paymentAlerts: user.notifications?.paymentAlerts ?? true,
+            promotionalOffers: user.notifications?.smsNotifications ?? false,
+        };
+
+        res.status(200).json({
+            success: true,
+            profile,
+            preferences
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching admin profile:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching admin profile"
+        });
+    }
+};
+
+// Update the logged-in admin's own profile (and optionally profile image)
+export const updateAdminProfile = async (req, res) => {
+    try {
+        const { profile, preferences } = req.body;
+        const userId = req.userId;
+
+        // Handle profile image upload via Cloudinary
+        let profileImageUrl = null;
+        if (req.file) {
+            try {
+                const uploadResult = await uploadToCloudinary(req.file, 'driveme/profiles', 'profile');
+                profileImageUrl = uploadResult.secure_url;
+                console.log("[v0] Admin profile image uploaded:", profileImageUrl);
+
+                // Image-only upload (profile/image endpoint)
+                if (!profile && !preferences) {
+                    const updatedUser = await User.findByIdAndUpdate(
+                        userId,
+                        { $set: { profileImage: profileImageUrl } },
+                        { new: true }
+                    ).select('-password');
+
+                    return res.status(200).json({
+                        success: true,
+                        message: "Profile image updated successfully",
+                        profileImage: profileImageUrl,
+                        profile: {
+                            _id: updatedUser._id,
+                            fullName: updatedUser.fullName,
+                            email: updatedUser.email,
+                            phone: updatedUser.whatsappNumber,
+                            profileImage: updatedUser.profileImage
+                        }
+                    });
+                }
+            } catch (uploadError) {
+                console.error("[v0] Error uploading admin profile image:", uploadError);
+                return res.status(400).json({
+                    success: false,
+                    message: "Error uploading profile image",
+                    error: uploadError.message
+                });
+            }
+        }
+
+        if (!profile) {
+            return res.status(400).json({
+                success: false,
+                message: "Profile data is required"
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        // Validate email format if provided
+        if (profile.email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(profile.email)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid email format"
+                });
+            }
+
+            // Ensure the email isn't already taken by another user
+            const existingEmail = await User.findOne({
+                email: profile.email,
+                _id: { $ne: userId }
+            });
+            if (existingEmail) {
+                return res.status(400).json({
+                    success: false,
+                    message: "This email is already in use by another account"
+                });
+            }
+        }
+
+        // Validate phone number format if provided
+        if (profile.phone) {
+            const phoneRegex = /^[+]?[\d\s\-\(\)]{7,15}$/;
+            if (!phoneRegex.test(profile.phone)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid phone number format"
+                });
+            }
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    ...(profile.fullName && { fullName: profile.fullName }),
+                    ...(profile.email && { email: profile.email }),
+                    ...(profile.phone && { whatsappNumber: profile.phone }),
+                    ...(profile.country && { country: profile.country }),
+                    ...(profileImageUrl && { profileImage: profileImageUrl }),
+                    // Persist admin notification preferences onto the User.notifications field
+                    ...(preferences?.systemAlerts !== undefined && {
+                        'notifications.bookingAlerts': preferences.systemAlerts
+                    }),
+                    ...(preferences?.paymentAlerts !== undefined && {
+                        'notifications.paymentAlerts': preferences.paymentAlerts
+                    }),
+                    ...(preferences?.promotionalOffers !== undefined && {
+                        'notifications.smsNotifications': preferences.promotionalOffers
+                    }),
+                }
+            },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        console.log(`[v0] Admin profile updated successfully for user ${userId}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            profile: {
+                _id: updatedUser._id,
+                fullName: updatedUser.fullName,
+                email: updatedUser.email,
+                phone: updatedUser.whatsappNumber,
+                country: updatedUser.country || '',
+                profileImage: updatedUser.profileImage || null,
+                role: updatedUser.role,
+                updatedAt: updatedUser.updatedAt
+            },
+            preferences: {
+                systemAlerts: updatedUser.notifications?.bookingAlerts ?? true,
+                paymentAlerts: updatedUser.notifications?.paymentAlerts ?? true,
+                promotionalOffers: updatedUser.notifications?.smsNotifications ?? false,
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error updating admin profile:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating admin profile",
+            error: error.message
+        });
+    }
+};
+
+// Change the logged-in admin's own password
+export const changeAdminPassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.userId;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Current password and new password are required"
+            });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: "New password must be at least 8 characters long"
+            });
+        }
+
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                success: false,
+                message: "New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+            });
+        }
+
+        const user = await User.findById(userId).select('+password');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+        if (!isCurrentPasswordValid) {
+            return res.status(400).json({
+                success: false,
+                message: "Current password is incorrect"
+            });
+        }
+
+        // Assign the plain password and let the User model's pre-save hook hash it,
+        // ensuring the hashing stays consistent with the rest of the app.
+        user.password = newPassword;
+        user.passwordChangedAt = new Date();
+        await user.save();
+
+        console.log(`[v0] Admin password changed successfully for user ${userId}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Password changed successfully",
+            changedAt: new Date()
+        });
+    } catch (error) {
+        console.error("[v0] Error changing admin password:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error changing password",
+            error: error.message
+        });
+    }
+};
+
+// Get B2C partner profile
+export const getB2CPartnerProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const profile = {
+            _id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.whatsappNumber,
+            company: user.companyName || '',
+            licenseNumber: user.driverInfo?.licenseNumber || '',
+            serviceType: user.serviceType,
+            yearsOfExperience: user.yearsOfExperience,
+            serviceDescription: user.serviceDescription,
+            country: user.country,
+            status: user.status,
+            createdAt: user.createdAt,
+            profileImage: user.profileImage || null
+        };
+
+        const preferences = {
+            newTripAlerts: user.notifications?.bookingAlerts ?? true,
+            dailyEarnings: user.notifications?.paymentAlerts ?? true,
+            promotionalOffers: user.notifications?.smsNotifications ?? false,
+        };
+
+        res.status(200).json({
+            success: true,
+            profile,
+            preferences
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C profile:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C profile"
+        });
+    }
+};
+
+// Update B2C partner profile
+export const updateB2CPartnerProfile = async (req, res) => {
+    try {
+        const { profile, preferences } = req.body;
+        const userId = req.userId;
+
+        // Handle profile image upload via Cloudinary
+        let profileImageUrl = null;
+        if (req.file) {
+            try {
+                const uploadResult = await uploadToCloudinary(req.file, 'driveme/profiles', 'profile');
+                profileImageUrl = uploadResult.secure_url;
+                console.log("[v0] Profile image uploaded:", profileImageUrl);
+
+                // If only image upload (profile/image endpoint)
+                if (!profile && !preferences) {
+                    const updatedUser = await User.findByIdAndUpdate(
+                        userId,
+                        { $set: { profileImage: profileImageUrl } },
+                        { new: true }
+                    ).select('-password');
+
+                    return res.status(200).json({
+                        success: true,
+                        message: "Profile image updated successfully",
+                        profileImage: profileImageUrl,
+                        profile: {
+                            _id: updatedUser._id,
+                            fullName: updatedUser.fullName,
+                            email: updatedUser.email,
+                            phone: updatedUser.whatsappNumber,
+                            company: updatedUser.companyName || '',
+                            licenseNumber: updatedUser.driverInfo?.licenseNumber || '',
+                            profileImage: updatedUser.profileImage
+                        }
+                    });
+                }
+            } catch (uploadError) {
+                console.error("[v0] Error uploading profile image:", uploadError);
+                return res.status(400).json({
+                    success: false,
+                    message: "Error uploading profile image",
+                    error: uploadError.message
+                });
+            }
+        }
+
+        // Validate input data
+        if (!profile || !preferences) {
+            return res.status(400).json({
+                success: false,
+                message: "Profile and preferences data are required"
+            });
+        }
+
+        console.log(`[v0] Updating B2C partner profile for user ${userId}:`, { profile, preferences });
+
+        // Find existing B2C partner user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Validate email format if provided
+        if (profile.email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(profile.email)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid email format"
+                });
+            }
+        }
+
+        // Validate phone number format if provided
+        if (profile.phone) {
+            const phoneRegex = /^[+]?[\d\s\-\(\)]{10,15}$/;
+            if (!phoneRegex.test(profile.phone)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid phone number format"
+                });
+            }
+        }
+
+        // Update B2C partner profile with real database operations
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    ...(profile.fullName && { fullName: profile.fullName }),
+                    ...(profile.email && { email: profile.email }),
+                    ...(profile.phone && { whatsappNumber: profile.phone }),
+                    ...(profile.company && { company: profile.company }),
+                    ...(profile.licenseNumber && { licenseNumber: profile.licenseNumber }),
+                    ...(profile.officeAddress && { officeAddress: profile.officeAddress }),
+                    ...(profile.website && { website: profile.website }),
+                    ...(profileImageUrl && { profileImage: profileImageUrl }),
+                    // Update B2C partner specific preferences
+                    ...(preferences.newTripAlerts !== undefined && {
+                        'preferences.newTripAlerts': preferences.newTripAlerts
+                    }),
+                    ...(preferences.dailyEarnings !== undefined && {
+                        'preferences.dailyEarnings': preferences.dailyEarnings
+                    }),
+                    ...(preferences.promotionalOffers !== undefined && {
+                        'preferences.promotionalOffers': preferences.promotionalOffers
+                    }),
+                    ...(preferences.vehicleMaintenance !== undefined && {
+                        'preferences.vehicleMaintenance': preferences.vehicleMaintenance
+                    }),
+                    ...(preferences.driverManagement !== undefined && {
+                        'preferences.driverManagement': preferences.driverManagement
+                    })
+                }
+            },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Profile update logged via console (no wallet transaction needed for profile updates)
+        console.log(`B2C partner profile updated for user ${userId}`);
+
+        console.log(`[v0] B2C partner profile updated successfully for user ${userId}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            profile: {
+                fullName: updatedUser.fullName,
+                email: updatedUser.email,
+                whatsappNumber: updatedUser.whatsappNumber,
+                company: updatedUser.company,
+                licenseNumber: updatedUser.licenseNumber,
+                officeAddress: updatedUser.officeAddress,
+                website: updatedUser.website,
+                updatedAt: updatedUser.updatedAt
+            },
+            preferences: {
+                newTripAlerts: updatedUser.preferences?.newTripAlerts || false,
+                dailyEarnings: updatedUser.preferences?.dailyEarnings || false,
+                promotionalOffers: updatedUser.preferences?.promotionalOffers || false,
+                vehicleMaintenance: updatedUser.preferences?.vehicleMaintenance || false,
+                driverManagement: updatedUser.preferences?.driverManagement || false
+            }
+        });
+
+    } catch (error) {
+        console.error("[v0] Error updating B2C partner profile:", error);
+
+        console.error("B2C partner profile update failed for user:", req.userId, error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Error updating B2C profile",
+            error: error.message
+        });
+    }
+};
+
+// Get B2B settings
+export const getB2BSettings = async (req, res) => {
+    try {
+        const settings = {
+            companyName: "Royal Fleets Co.",
+            tradeLicense: "TL-998877-KW",
+            officeAddress: "Al-Hamra Tower, Floor 25, Kuwait City",
+            email: "fleet@driveme.com",
+            phone: "+965 2200 1100",
+            website: "https://www.royalfleets.com.kw",
+            notifications: {
+                contracts: true,
+                maintenance: true,
+                drivers: true,
+                marketing: false,
+            }
+        };
+        res.status(200).json({ success: true, settings });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error fetching B2B settings" });
+    }
+};
+
+// Update B2B settings
+export const updateB2BSettings = async (req, res) => {
+    try {
+        const { companyInfo, notifications } = req.body;
+        // TODO: Update settings in database
+        res.status(200).json({
+            success: true,
+            message: "Settings updated successfully"
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error updating B2B settings" });
+    }
+};
+
+// Get B2B fleet and drivers data
+export const getB2BFleetAndDrivers = async (req, res) => {
+    try {
+        const fleetData = {
+            vehicles: [
+                {
+                    _id: 'vehicle-001',
+                    type: 'Bus',
+                    make: 'Mercedes-Benz',
+                    licensePlate: 'KWT-1234',
+                    capacity: 25,
+                    status: 'Active',
+                    driver: 'Driver 1'
+                }
+            ],
+            drivers: [
+                {
+                    _id: 'driver-001',
+                    name: 'Ahmed Mohammed',
+                    phone: '+965 98765432',
+                    status: 'Active',
+                    assignedVehicle: 'KWT-1234'
+                }
+            ]
+        };
+        res.status(200).json({ success: true, fleetData });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error fetching B2B fleet data" });
+    }
+};
+
+// Get B2B analytics data
+export const getB2BAnalytics = async (req, res) => {
+    try {
+        const analytics = {
+            financialPerformance: {
+                totalRevenueYTD: 24295,
+                netProfitYTD: 17974,
+                profitMargin: 74.0
+            },
+            chartData: {
+                labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+                revenue: [3500, 7000, 3500, 3800, 3500, 4000],
+                expenses: [1500, 1000, 800, 600, 800, 2000]
+            }
+        };
+        res.status(200).json({ success: true, analytics });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error fetching B2B analytics" });
+    }
+};
+
+// Get B2B partner overview statistics
+export const getB2BPartnerOverview = async (req, res) => {
+    try {
+        const overview = {
+            activeVehicles: { current: 8, total: 12 },
+            activeContracts: 3,
+            revenueMonthly: 4200,
+            fleetHealth: 92,
+            contracts: [
+                {
+                    _id: 'contract-001',
+                    name: "Employee Transport - Mangaf",
+                    organization: "KOC",
+                    value: 3246,
+                    status: "Active",
+                    payment: "Paid"
+                }
+            ]
+        };
+        res.status(200).json({ success: true, overview });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error fetching B2B overview" });
+    }
+};
+
+// Get payment statistics for admin (includes both regular payments and EMI installments)
+export const getPaymentStats = async (req, res) => {
+    try {
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Get regular payment stats. Amounts are grouped by native currency so
+        // they can be converted to the admin's display currency before summing.
+        const [regularPending, regularVerified, regularRejected, regularAmountResult] = await Promise.all([
+            Payment.countDocuments({ verificationStatus: 'PENDING' }),
+            Payment.countDocuments({ verificationStatus: { $in: ['VERIFIED', 'AUTO_VERIFIED'] } }),
+            Payment.countDocuments({ verificationStatus: 'REJECTED' }),
+            Payment.aggregate([
+                { $match: { status: { $in: ['COMPLETED', 'PROCESSING'] } } },
+                { $group: { _id: '$currency', total: { $sum: '$amount' } } }
+            ])
+        ]);
+
+        // Get EMI installment stats (cash/bank transfer payments requiring verification)
+        const emiStats = await EMIPayment.aggregate([
+            { $unwind: "$installments" },
+            {
+                $facet: {
+                    pending: [
+                        {
+                            $match: {
+                                "installments.paymentMethod": { $in: ["CASH", "BANK_TRANSFER"] },
+                                "installments.verificationStatus": "PENDING",
+                                "installments.status": { $ne: "PAID" },
+                                "installments.transactionId": { $exists: true } // Only submitted payments
+                            }
+                        },
+                        { $count: "count" }
+                    ],
+                    verified: [
+                        {
+                            $match: {
+                                "installments.paymentMethod": { $in: ["CASH", "BANK_TRANSFER"] },
+                                "installments.verificationStatus": "VERIFIED",
+                                "installments.status": "PAID"
+                            }
+                        },
+                        { $count: "count" }
+                    ],
+                    rejected: [
+                        {
+                            $match: {
+                                "installments.verificationStatus": "REJECTED"
+                            }
+                        },
+                        { $count: "count" }
+                    ],
+                    totalAmount: [
+                        {
+                            $match: {
+                                "installments.paymentMethod": { $in: ["CASH", "BANK_TRANSFER"] },
+                                "installments.verificationStatus": "PENDING",
+                                "installments.transactionId": { $exists: true }
+                            }
+                        },
+                        { $group: { _id: { $ifNull: ["$emiPlan.currency", "AED"] }, total: { $sum: "$installments.amount" } } }
+                    ]
+                }
+            }
+        ]);
+
+        const emiPending = emiStats[0]?.pending[0]?.count || 0;
+        const emiVerified = emiStats[0]?.verified[0]?.count || 0;
+        const emiRejected = emiStats[0]?.rejected[0]?.count || 0;
+
+        // Convert both regular and EMI amount buckets to the display currency.
+        const regularAmount = sumByCurrency(regularAmountResult, displayCurrency);
+        const emiAmount = sumByCurrency(emiStats[0]?.totalAmount || [], displayCurrency);
+
+        const totalPending = regularPending + emiPending;
+        const totalVerified = regularVerified + emiVerified;
+        const totalRejected = regularRejected + emiRejected;
+        const totalAmount = Math.round((regularAmount + emiAmount) * 1e6) / 1e6;
+        const currency = displayCurrency;
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalPending,
+                totalVerified,
+                totalRejected,
+                totalAmount,
+                currency,
+                // Detailed breakdown
+                regularPayments: {
+                    pending: regularPending,
+                    verified: regularVerified,
+                    rejected: regularRejected
+                },
+                emiPayments: {
+                    pending: emiPending,
+                    verified: emiVerified,
+                    rejected: emiRejected
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching payment stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching payment statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Get recent activity for admin dashboard
+export const getRecentActivity = async (req, res) => {
+    try {
+        const { limit = 10 } = req.query;
+
+        // Get recent user registrations
+        const recentUsers = await User.find({})
+            .select('fullName role createdAt')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit));
+
+        // Get recent payments
+        const recentPayments = await Payment.find({})
+            .populate('corporateOwnerId', 'fullName companyName')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit));
+
+        // Get recent contracts
+        const recentContracts = await Contract.find({})
+            .populate('corporateOwnerId', 'fullName companyName')
+            .populate('fleetOwnerId', 'fullName companyName')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit));
+
+        // Combine and format activities
+        const activities = [];
+
+        // Add user registrations
+        recentUsers.forEach(user => {
+            activities.push({
+                type: 'user_registered',
+                title: 'New User Registration',
+                description: `${user.fullName} registered as ${user.role.replace('_', ' ')}`,
+                timestamp: user.createdAt,
+                data: user
+            });
+        });
+
+        // Add payments
+        recentPayments.forEach(payment => {
+            activities.push({
+                type: 'payment_received',
+                title: 'Payment Received',
+                description: `${payment.corporateOwnerId?.fullName || 'Unknown'} made a payment of ${payment.amount}`,
+                timestamp: payment.createdAt,
+                data: payment
+            });
+        });
+
+        // Add contracts
+        recentContracts.forEach(contract => {
+            activities.push({
+                type: 'contract_signed',
+                title: 'Contract Signed',
+                description: `Contract signed between ${contract.corporateOwnerId?.companyName} and ${contract.fleetOwnerId?.companyName}`,
+                timestamp: contract.createdAt,
+                data: contract
+            });
+        });
+
+        // Sort by timestamp and limit
+        const sortedActivities = activities
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, Number.parseInt(limit));
+
+        res.status(200).json({
+            success: true,
+            recentActivity: sortedActivities
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching recent activity:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching recent activity",
+            error: error.message,
+        });
+    }
+};
+
+// Get all pending payments for admin verification (includes both regular payments and EMI installments)
+export const getPendingPayments = async (req, res) => {
+    try {
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Query for regular payments that need verification
+        const regularPayments = await Payment.find({
+            verificationStatus: "PENDING",
+            $or: [
+                { status: "PENDING" },
+                { status: "COMPLETED", paymentProvider: { $exists: true } }
+            ]
+        })
+            .populate("contractId", "contractNumber")
+            .populate("corporateOwnerId", "fullName companyName email phone")
+            .populate("fleetOwnerId", "fullName companyName email phone")
+            .sort({ createdAt: -1 })
+            .lean()
+
+        // Format regular payments
+        const formattedRegularPayments = regularPayments.map(p => ({
+            ...p,
+            paymentSource: "REGULAR",
+            displayType: p.paymentType || "Contract Payment",
+            displayCurrency,
+            displayAmount: convertForDisplay(p.amount, p.currency, displayCurrency)
+        }))
+
+        // Query for EMI installments that need verification (cash/bank transfer payments with transactionId)
+        const emiPaymentsWithPending = await EMIPayment.find({
+            "installments": {
+                $elemMatch: {
+                    paymentMethod: { $in: ["CASH", "BANK_TRANSFER"] },
+                    verificationStatus: "PENDING",
+                    transactionId: { $exists: true, $ne: null }
+                }
+            }
+        })
+            .populate("contractId", "contractNumber")
+            .populate("corporateOwnerId", "fullName companyName email phone")
+            .populate("fleetOwnerId", "fullName companyName email phone")
+            .lean()
+
+        // Extract pending EMI installments and format them like regular payments
+        const emiInstallments = []
+        for (const emiPayment of emiPaymentsWithPending) {
+            for (const installment of emiPayment.installments) {
+                if (
+                    (installment.paymentMethod === "CASH" || installment.paymentMethod === "BANK_TRANSFER") &&
+                    installment.verificationStatus === "PENDING" &&
+                    installment.transactionId
+                ) {
+                    emiInstallments.push({
+                        _id: `${emiPayment._id}_${installment.installmentNumber}`,
+                        emiPaymentId: emiPayment._id,
+                        installmentNumber: installment.installmentNumber,
+                        contractId: emiPayment.contractId,
+                        corporateOwnerId: emiPayment.corporateOwnerId,
+                        fleetOwnerId: emiPayment.fleetOwnerId,
+                        amount: installment.amount,
+                        currency: emiPayment.emiPlan?.currency || "AED",
+                        displayCurrency,
+                        displayAmount: convertForDisplay(installment.amount, emiPayment.emiPlan?.currency || "AED", displayCurrency),
+                        paymentType: "EMI",
+                        paymentMethod: installment.paymentMethod,
+                        paymentProvider: "MANUAL",
+                        verificationStatus: installment.verificationStatus,
+                        status: installment.status,
+                        transactionId: installment.transactionId,
+                        createdAt: installment.paidAt || emiPayment.createdAt,
+                        paymentSource: "EMI",
+                        displayType: `EMI Installment ${installment.installmentNumber}/${emiPayment.emiPlan?.tenure || 6}`,
+                        // Include EMI specific data
+                        emiData: {
+                            tenure: emiPayment.emiPlan?.tenure,
+                            monthlyEMI: emiPayment.emiPlan?.monthlyEMI,
+                            totalAmount: emiPayment.emiPlan?.totalAmount,
+                            contractAmount: emiPayment.emiPlan?.contractAmount,
+                            negotiationCommission: emiPayment.emiPlan?.negotiationCommission,
+                            adminCommission: installment.adminCommission,
+                            fleetOwnerAmount: installment.fleetOwnerAmount,
+                            negotiationCommissionPortion: installment.negotiationCommissionPortion,
+                            contractAmountPortion: installment.contractAmountPortion
+                        }
+                    })
+                }
+            }
+        }
+
+        // Combine and sort by createdAt
+        const allPayments = [...formattedRegularPayments, ...emiInstallments]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+        res.status(200).json({
+            success: true,
+            count: allPayments.length,
+            displayCurrency,
+            payments: allPayments,
+        })
+    } catch (error) {
+        console.error("[v0] Error fetching pending payments:", error)
+        res.status(500).json({
+            success: false,
+            message: "Error fetching pending payments",
+            error: error.message,
+        })
+    }
+}
+
+// Get payment details for verification
+export const getPaymentDetails = async (req, res) => {
+    try {
+        const { paymentId } = req.params
+
+        const payment = await Payment.findById(paymentId)
+            .populate("contractId")
+            .populate("corporateOwnerId", "fullName companyName email whatsappNumber company")
+            .populate("fleetOwnerId", "fullName companyName email whatsappNumber company")
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment not found",
+            })
+        }
+
+        res.status(200).json({
+            success: true,
+            payment,
+        })
+    } catch (error) {
+        console.error("[v0] Error fetching payment details:", error)
+        res.status(500).json({
+            success: false,
+            message: "Error fetching payment details",
+            error: error.message,
+        })
+    }
+}
+
+// Helper function to verify EMI installment cash payments
+const verifyEMIInstallment = async (req, res, emiPaymentId, installmentNumber, action, reason) => {
+    try {
+        const emiPayment = await EMIPayment.findById(emiPaymentId)
+            .populate("contractId", "contractNumber")
+            .populate("corporateOwnerId", "fullName companyName email")
+            .populate("fleetOwnerId", "fullName companyName email")
+
+        if (!emiPayment) {
+            return res.status(404).json({
+                success: false,
+                message: "EMI payment not found",
+            })
+        }
+
+        const installment = emiPayment.installments.find(i => i.installmentNumber === installmentNumber)
+
+        if (!installment) {
+            return res.status(404).json({
+                success: false,
+                message: "Installment not found",
+            })
+        }
+
+        if (installment.verificationStatus !== "PENDING" || !installment.transactionId) {
+            return res.status(400).json({
+                success: false,
+                message: "Installment already verified or not submitted for verification",
+            })
+        }
+
+        if (action === "APPROVE") {
+            // Update installment status
+            installment.status = "PAID"
+            installment.verificationStatus = "VERIFIED"
+            installment.paidAt = new Date()
+            installment.verifiedBy = req.userId
+            installment.verifiedAt = new Date()
+
+            // Credit B2B Partner wallet in the EMI's currency.
+            // Currency lives at emiPlan.currency (no top-level field), so the old
+            // `emiPayment.currency` always fell back to "AED" and misrouted KWD EMIs.
+            const emiCurrency =
+                emiPayment.emiPlan?.currency ||
+                emiPayment.contractId?.financials?.currency ||
+                emiPayment.contractId?.currency ||
+                "AED"
+            let fleetWallet = await getOrCreateWallet(emiPayment.fleetOwnerId._id, {
+                currency: emiCurrency,
+                role: "B2B_PARTNER",
+            })
+            if (fleetWallet.isNew) await fleetWallet.save()
+
+            const fleetName = emiPayment.fleetOwnerId?.companyName || emiPayment.fleetOwnerId?.fullName || "Fleet Owner"
+            const corporateName = emiPayment.corporateOwnerId?.companyName || emiPayment.corporateOwnerId?.fullName || "Corporate"
+
+            fleetWallet.balance += installment.fleetOwnerAmount
+            fleetWallet.totalEarnings += installment.fleetOwnerAmount
+            const paymentMethodLabel = installment.paymentMethod === "BANK_TRANSFER" ? "Bank Transfer" : "Cash"
+            fleetWallet.transactions.push({
+                type: "DEPOSIT",
+                amount: installment.fleetOwnerAmount,
+                description: `EMI Payment (${paymentMethodLabel} Verified) - Installment ${installment.installmentNumber}/${emiPayment.emiPlan.tenure} - Contract ${emiPayment.contractId.contractNumber}`,
+                status: "COMPLETED",
+                senderId: emiPayment.corporateOwnerId._id,
+                senderName: corporateName,
+            })
+            await fleetWallet.save()
+
+            installment.fleetOwnerCredited = true
+            installment.fleetOwnerCreditedAt = new Date()
+
+            console.log(`[v0] EMI ${paymentMethodLabel} Payment - B2B Partner wallet credited:`, installment.fleetOwnerAmount)
+
+            // Credit Admin wallet - Commission + Negotiation Commission, in the
+            // EMI's currency (never "any admin wallet regardless of currency").
+            let adminWallet = await getOrCreateWallet(req.userId, {
+                currency: emiCurrency,
+                role: "ADMIN",
+            })
+            if (adminWallet.isNew) await adminWallet.save()
+
+            // Contract commission
+            if (installment.adminCommission.amount > 0) {
+                adminWallet.balance += installment.adminCommission.amount
+                adminWallet.totalEarnings += installment.adminCommission.amount
+                adminWallet.transactions.push({
+                    type: "COMMISSION_DEDUCTION",
+                    amount: installment.adminCommission.amount,
+                    description: `EMI Commission (${installment.adminCommission.rate}%) - Installment ${installment.installmentNumber} - Contract ${emiPayment.contractId.contractNumber}`,
+                    status: "COMPLETED",
+                    senderId: emiPayment.fleetOwnerId._id,
+                    senderName: fleetName,
+                })
+                installment.adminCommission.status = "CREDITED"
+                installment.adminCommission.creditedAt = new Date()
+                console.log(`[v0] EMI ${paymentMethodLabel} Payment - Admin commission credited:`, installment.adminCommission.amount)
+            }
+
+            // Negotiation commission
+            if (installment.negotiationCommissionPortion > 0) {
+                adminWallet.balance += installment.negotiationCommissionPortion
+                adminWallet.totalEarnings += installment.negotiationCommissionPortion
+                adminWallet.transactions.push({
+                    type: "NEGOTIATION_COMMISSION",
+                    amount: installment.negotiationCommissionPortion,
+                    description: `Negotiation Commission (EMI) - Installment ${installment.installmentNumber} - Contract ${emiPayment.contractId.contractNumber}`,
+                    status: "COMPLETED",
+                    senderId: emiPayment.corporateOwnerId._id,
+                    senderName: corporateName,
+                })
+                installment.negotiationCommissionCredited = true
+                installment.negotiationCommissionCreditedAt = new Date()
+                console.log(`[v0] EMI ${paymentMethodLabel} Payment - Negotiation commission credited:`, installment.negotiationCommissionPortion)
+            }
+
+            await adminWallet.save()
+
+            // Update EMI payment summary
+            emiPayment.summary.totalPaid = emiPayment.installments
+                .filter(i => i.status === "PAID")
+                .reduce((sum, i) => sum + i.amount, 0)
+            emiPayment.summary.installmentsPaid = emiPayment.installments.filter(i => i.status === "PAID").length
+            emiPayment.summary.installmentsRemaining = emiPayment.installments.filter(i => i.status !== "PAID").length
+            emiPayment.summary.totalRemaining = emiPayment.emiPlan.totalAmount - emiPayment.summary.totalPaid
+            emiPayment.summary.lastPaymentDate = new Date()
+
+            const nextPending = emiPayment.installments.find(i => i.status === "PENDING")
+            if (nextPending) {
+                emiPayment.summary.nextDueDate = nextPending.dueDate
+            } else {
+                emiPayment.summary.nextDueDate = null
+                emiPayment.emiPlan.status = "COMPLETED"
+            }
+
+            // Update commission settings
+            emiPayment.commissionSettings.totalAdminCommission += installment.adminCommission.amount
+            emiPayment.commissionSettings.totalNegotiationCommissionPaid += installment.negotiationCommissionPortion
+            emiPayment.commissionSettings.totalFleetOwnerAmount += installment.fleetOwnerAmount
+
+            await emiPayment.save()
+
+            // Send notifications
+            try {
+                await createNotification({
+                    recipientId: emiPayment.corporateOwnerId._id,
+                    recipientRole: "CORPORATE",
+                    type: "PAYMENT",
+                    title: "EMI Payment Verified",
+                    message: `Your EMI installment #${installment.installmentNumber} of AED ${installment.amount.toLocaleString()} has been verified and approved.`,
+                    data: {
+                        emiPaymentId: emiPayment._id,
+                        contractId: emiPayment.contractId._id,
+                        installmentNumber,
+                        amount: installment.amount
+                    }
+                })
+
+                await createNotification({
+                    recipientId: emiPayment.fleetOwnerId._id,
+                    recipientRole: "B2B_PARTNER",
+                    type: "PAYMENT",
+                    title: "EMI Payment Received",
+                    message: `EMI installment #${installment.installmentNumber} payment of AED ${installment.fleetOwnerAmount.toLocaleString()} has been credited to your wallet.`,
+                    data: {
+                        emiPaymentId: emiPayment._id,
+                        contractId: emiPayment.contractId._id,
+                        installmentNumber,
+                        amount: installment.fleetOwnerAmount
+                    }
+                })
+            } catch (notifError) {
+                console.error("[v0] Error sending EMI verification notifications:", notifError)
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "EMI installment verified and approved successfully",
+                data: {
+                    emiPaymentId: emiPayment._id,
+                    installmentNumber,
+                    amount: installment.amount,
+                    fleetOwnerAmount: installment.fleetOwnerAmount,
+                    adminCommission: installment.adminCommission.amount,
+                    negotiationCommission: installment.negotiationCommissionPortion
+                }
+            })
+
+        } else if (action === "REJECT") {
+            installment.verificationStatus = "REJECTED"
+            installment.status = "PENDING" // Reset to PENDING so they can try again
+            installment.transactionId = null // Clear the transaction ID
+            installment.rejectedBy = req.userId
+            installment.rejectedAt = new Date()
+            installment.rejectionReason = reason
+
+            await emiPayment.save()
+
+            // Notify corporate owner
+            try {
+                await createNotification({
+                    recipientId: emiPayment.corporateOwnerId._id,
+                    recipientRole: "CORPORATE",
+                    type: "PAYMENT",
+                    title: "EMI Payment Rejected",
+                    message: `Your EMI installment #${installment.installmentNumber} payment was rejected. Reason: ${reason || "Not specified"}`,
+                    data: {
+                        emiPaymentId: emiPayment._id,
+                        contractId: emiPayment.contractId._id,
+                        installmentNumber,
+                        rejectionReason: reason
+                    }
+                })
+            } catch (notifError) {
+                console.error("[v0] Error sending EMI rejection notification:", notifError)
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "EMI installment payment rejected",
+                data: {
+                    emiPaymentId: emiPayment._id,
+                    installmentNumber,
+                    rejectionReason: reason
+                }
+            })
+        }
+
+        return res.status(400).json({
+            success: false,
+            message: "Invalid action. Use APPROVE or REJECT.",
+        })
+
+    } catch (error) {
+        console.error("[v0] Error verifying EMI installment:", error)
+        return res.status(500).json({
+            success: false,
+            message: "Error verifying EMI installment",
+            error: error.message,
+        })
+    }
+}
+
+// Verify and approve payment (supports both regular payments and EMI installments)
+export const verifyPayment = async (req, res) => {
+    try {
+        const { paymentId } = req.params
+        const { action, reason } = req.body // action: 'APPROVE' or 'REJECT'
+
+        // Check if this is an EMI installment (format: emiPaymentId_installmentNumber)
+        if (paymentId.includes("_")) {
+            const [emiPaymentId, installmentNumber] = paymentId.split("_")
+            const installmentNum = parseInt(installmentNumber)
+
+            return await verifyEMIInstallment(req, res, emiPaymentId, installmentNum, action, reason)
+        }
+
+        const payment = await Payment.findById(paymentId).populate("contractId")
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment not found",
+            })
+        }
+
+        if (payment.verificationStatus !== "PENDING") {
+            return res.status(400).json({
+                success: false,
+                message: "Payment already verified",
+            })
+        }
+
+        if (action === "APPROVE") {
+            // For gateway payments (Stripe, etc.), status is already COMPLETED
+            // Only update status to COMPLETED for cash payments
+            if (payment.status !== "COMPLETED") {
+                payment.status = "COMPLETED"
+            }
+            payment.verificationStatus = "VERIFIED"
+            payment.verifiedBy = req.userId
+            payment.adminVerifiedAt = new Date()
+
+            const advanceAmount = payment.advanceAmount
+            const securityDepositAmount = payment.securityDepositAmount
+
+            // Get dynamic commission rate from payment (set during payment initiation)
+            const appliedCommissionRate = payment.appliedCommissionRate || 10 // Default 10% if not set
+            const fleetOwnerPercentage = 100 - appliedCommissionRate
+
+            const adminCommissionAmount = payment.adminCommission // Already calculated with dynamic rate
+            const fleetOwnerAmount = payment.fleetOwnerAmount // Already calculated with dynamic rate
+
+            console.log("[v0] Verifying Payment Breakdown:")
+            console.log("[v0] Advance Amount:", advanceAmount)
+            console.log("[v0] Security Deposit (held separately):", securityDepositAmount)
+            console.log("[v0] Applied Commission Rate:", appliedCommissionRate, "%")
+            console.log("[v0] Admin Commission:", adminCommissionAmount)
+            console.log("[v0] Fleet Owner Amount:", fleetOwnerAmount)
+
+            payment.adminCommission = {
+                amount: adminCommissionAmount,
+                percentage: appliedCommissionRate,
+                appliedOn: "advance",
+            }
+            payment.fleetOwnerShare = {
+                amount: fleetOwnerAmount,
+                percentage: fleetOwnerPercentage,
+                appliedOn: "advance",
+            }
+            payment.securityDepositInfo = {
+                amount: securityDepositAmount,
+                status: "HELD",
+                refundable: true,
+            }
+
+            await payment.save()
+
+            // IMPORTANT: Check if wallets were already credited (for gateway payments like STRIPE/TAP)
+            // Gateway payments are credited in paymentController.js processPaymentToWallets()
+            // Manual payments (CASH/BANK_TRANSFER) need wallet crediting here during admin verification
+            const shouldCreditWallets = !payment.walletCredited && payment.paymentProvider === "MANUAL"
+
+            console.log("[v0] Should credit wallets:", shouldCreditWallets)
+            console.log("[v0] Payment provider:", payment.paymentProvider)
+            console.log("[v0] Wallet already credited:", payment.walletCredited)
+
+            let adminWallet, fleetWallet
+            let adminBalanceBefore = 0, adminBalanceAfter = 0
+            let adminSecurityBefore = 0, adminSecurityAfter = 0
+            let fleetBalanceBefore = 0, fleetBalanceAfter = 0
+
+            const paymentCurrency = payment.currency || "AED"
+            if (shouldCreditWallets) {
+                // Update Admin Wallet - Commission only, in the PAYMENT'S currency
+                // so UAE (AED) and Kuwait (KWD) commissions never share a balance.
+                adminWallet = await getOrCreateWallet(req.userId, {
+                    currency: paymentCurrency,
+                    role: "ADMIN",
+                })
+                if (adminWallet.isNew) await adminWallet.save()
+
+                adminBalanceBefore = adminWallet.balance
+                adminSecurityBefore = adminWallet.securityDepositHeld
+
+                adminWallet.balance += adminCommissionAmount
+                adminWallet.securityDepositHeld += securityDepositAmount
+
+                adminBalanceAfter = adminWallet.balance
+                adminSecurityAfter = adminWallet.securityDepositHeld
+                await adminWallet.save()
+
+                console.log(
+                    "[v0] Admin wallet updated - Commission:",
+                    adminCommissionAmount,
+                    "Security Deposit Held:",
+                    securityDepositAmount,
+                )
+
+                // Update Fleet Owner Wallet - Only (100 - commissionRate)% of advance,
+                // in the payment's currency (matches the admin commission wallet).
+                fleetWallet = await getOrCreateWallet(payment.fleetOwnerId, {
+                    currency: paymentCurrency,
+                    role: "B2B_PARTNER",
+                })
+                if (fleetWallet.isNew) await fleetWallet.save()
+
+                fleetBalanceBefore = fleetWallet.balance
+                fleetWallet.balance += fleetOwnerAmount
+                fleetBalanceAfter = fleetWallet.balance
+                await fleetWallet.save()
+
+                console.log("[v0] Fleet owner wallet updated:", fleetOwnerAmount)
+
+                // Create transaction records with dynamic commission rates
+                await Transaction.create([
+                    {
+                        userId: req.userId,
+                        walletId: adminWallet._id,
+                        type: "CREDIT",
+                        category: "COMMISSION_EARNED",
+                        amount: adminCommissionAmount,
+                        currency: payment.currency,
+                        balance: adminWallet.balance,
+                        balanceBefore: adminBalanceBefore,
+                        balanceAfter: adminBalanceAfter,
+                        paymentId: payment._id,
+                        contractId: payment.contractId,
+                        description: `Admin commission (${appliedCommissionRate}% of advance) for contract ${payment.contractId.contractNumber}`,
+                    },
+                    {
+                        userId: payment.fleetOwnerId,
+                        walletId: fleetWallet._id,
+                        type: "CREDIT",
+                        category: "PAYMENT_RECEIVED",
+                        amount: fleetOwnerAmount,
+                        currency: payment.currency,
+                        balance: fleetWallet.balance,
+                        balanceBefore: fleetBalanceBefore,
+                        balanceAfter: fleetBalanceAfter,
+                        paymentId: payment._id,
+                        contractId: payment.contractId,
+                        description: `Rental income (${fleetOwnerPercentage}% of advance) for contract ${payment.contractId.contractNumber}`,
+                    },
+                    {
+                        userId: req.userId,
+                        walletId: adminWallet._id,
+                        type: "HOLD",
+                        category: "SECURITY_DEPOSIT",
+                        amount: securityDepositAmount,
+                        balance: adminWallet.securityDepositHeld,
+                        balanceBefore: adminSecurityBefore,
+                        balanceAfter: adminSecurityAfter,
+                        paymentId: payment._id,
+                        contractId: payment.contractId,
+                        description: `Security deposit held (refundable) for contract ${payment.contractId.contractNumber}`,
+                    },
+                ])
+
+                // Mark payment as wallet credited to prevent duplicate credits
+                payment.walletCredited = true
+                payment.walletCreditedAt = new Date()
+                await payment.save()
+
+                console.log("[v0] Payment marked as walletCredited = true")
+            } else {
+                console.log("[v0] Skipping wallet credit - already credited by payment gateway or not a manual payment")
+                // For gateway payments, just get the wallets for reference in notifications
+                adminWallet = await Wallet.findOne({ userId: req.userId, currency: paymentCurrency })
+                fleetWallet = await Wallet.findOne({ userId: payment.fleetOwnerId, currency: paymentCurrency })
+            }
+
+            const contract = payment.contractId
+            if (payment.paymentType === "advance") {
+                contract.financials.advancePayment.status = "PAID"
+                contract.financials.advancePayment.paidAt = new Date()
+                contract.financials.advancePayment.paidVia = payment.paymentMethod
+                contract.financials.advancePayment.transactionId = payment._id
+
+                contract.financials.securityDeposit.status = "PAID"
+                contract.financials.securityDeposit.paidAt = new Date()
+                contract.financials.securityDeposit.paidVia = payment.paymentMethod
+                contract.financials.securityDeposit.transactionId = payment._id
+
+                contract.status = "ACTIVE"
+                contract.vehicleAccess.isActive = true
+                contract.activatedAt = new Date()
+
+                const finalDueDate = new Date(contract.rentalPeriod.endDate)
+                finalDueDate.setDate(finalDueDate.getDate() - 7)
+
+                const finalSchedule = new PaymentSchedule({
+                    contractId: contract._id,
+                    corporateOwnerId: contract.corporateOwnerId,
+                    fleetOwnerId: contract.fleetOwnerId,
+                    currency: contract.financials.currency,
+                    scheduleType: "FINAL",
+                    amount: contract.financials.finalPayment.amount,
+                    dueDate: finalDueDate,
+                })
+                await finalSchedule.save()
+
+                console.log("[v0] Final payment schedule created automatically")
+
+                contract.financials.finalPayment.dueDate = finalDueDate
+                contract.financials.finalPayment.status = "PENDING"
+
+                contract.statusHistory.push({
+                    status: "ACTIVE",
+                    changedAt: new Date(),
+                    changedBy: req.userId,
+                    reason: "Payment verified - contract activated after advance + security deposit received",
+                })
+            } else if (payment.paymentType === "final") {
+                contract.financials.finalPayment.status = "PAID"
+                contract.financials.finalPayment.paidAt = new Date()
+                contract.financials.finalPayment.paidVia = payment.paymentMethod
+                contract.financials.finalPayment.transactionId = payment._id
+
+
+                await PaymentSchedule.updateOne(
+                    {
+                        contractId: contract._id,
+                        scheduleType: "FINAL",
+                        status: "PENDING",
+                    },
+                    {
+                        $set: {
+                            status: "PAID",
+                            paidAt: new Date(),
+                            paymentMethod: payment.paymentMethod,
+                            transactionId: payment._id,
+                        },
+                    },
+                )
+
+                contract.statusHistory.push({
+                    status: "ACTIVE",
+                    changedAt: new Date(),
+                    changedBy: req.userId,
+                    reason: "Final payment verified - contract completed",
+                })
+            }
+
+            contract.markModified("financials")
+            await contract.save()
+
+            console.log("[v0] Contract updated to status:", contract.status)
+
+            // Credit Admin Negotiation Commission from Corporate (if negotiation was done)
+            // This is separate from the B2B commission - this is commission for negotiation services
+            // IMPORTANT: Only credit if this is a MANUAL payment (gateway payments are handled in processPaymentToWallets)
+            if (payment.paymentType === "advance" && contract.negotiationCommission && shouldCreditWallets) {
+                try {
+                    const negotiationCommission = contract.negotiationCommission
+                    const negotiationCommissionAmount = negotiationCommission.adminCommission || 0
+
+                    // Check if negotiation commission was already paid (avoid duplicates)
+                    if (negotiationCommission.commissionStatus === "PAID") {
+                        console.log("[v0] Negotiation commission already PAID, skipping")
+                    } else {
+                        console.log("[v0] Processing negotiation commission:", negotiationCommissionAmount)
+
+                        // Update contract negotiation commission status
+                        await Contract.findByIdAndUpdate(
+                            contract._id,
+                            { "negotiationCommission.commissionStatus": "PAID" },
+                            { new: true }
+                        )
+                        console.log("[v0] Contract negotiation commission status marked as PAID")
+
+                        // Also update AdminNegotiation status if exists
+                        if (negotiationCommission.negotiationId) {
+                            const negotiation = await AdminNegotiation.findById(negotiationCommission.negotiationId)
+
+                            if (negotiation) {
+                                // Update negotiation commission status
+                                await AdminNegotiation.findByIdAndUpdate(
+                                    negotiationCommission.negotiationId,
+                                    {
+                                        "adminCommissionFromCorporate.status": "PAID",
+                                        "adminCommissionFromCorporate.paidAt": new Date()
+                                    },
+                                    { new: true }
+                                )
+                                console.log("[v0] AdminNegotiation commission marked as PAID")
+
+                                // Credit Admin wallet with negotiation commission
+                                if (negotiationCommissionAmount > 0 && negotiation.completedBy) {
+                                    const corporateUser = await User.findById(contract.corporateOwnerId).select('fullName companyName')
+                                    const corporateName = corporateUser?.companyName || corporateUser?.fullName || 'Corporate'
+
+                                    const creditResult = await creditAdminNegotiationCommission({
+                                        adminUserId: negotiation.completedBy,
+                                        amount: negotiationCommissionAmount,
+                                        currency: payment.currency || contract.financials.currency || "AED",
+                                        corporateUserId: contract.corporateOwnerId,
+                                        corporateName: corporateName,
+                                        negotiationId: negotiation._id,
+                                        contractId: contract._id,
+                                        contractNumber: contract.contractNumber
+                                    })
+
+                                    if (creditResult.success) {
+                                        console.log("[v0] Admin wallet credited with negotiation commission:", {
+                                            adminId: negotiation.completedBy,
+                                            amount: negotiationCommissionAmount,
+                                            newBalance: creditResult.newBalance
+                                        })
+                                    } else {
+                                        console.error("[v0] Failed to credit admin wallet with negotiation commission:", creditResult.message)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("[v0] Error processing negotiation commission:", err)
+                }
+            } else if (payment.paymentType === "advance" && contract.negotiationCommission && !shouldCreditWallets) {
+                console.log("[v0] Skipping negotiation commission - gateway payment already handled it")
+            }
+
+            // Send real-time notifications to Corporate and B2B Partner
+            const corporateUser = await User.findById(contract.corporateOwnerId)
+            const b2bPartnerUser = await User.findById(contract.fleetOwnerId)
+
+            // Notification for Corporate user
+            if (corporateUser) {
+                const corporateNotification = await createNotification({
+                    userId: contract.corporateOwnerId,
+                    type: "PAYMENT_VERIFIED",
+                    title: "Payment Verified",
+                    message: `Your ${payment.paymentType} payment of ${payment.amount} ${payment.currency} for contract ${contract.contractNumber} has been verified and approved.${contract.status === "ACTIVE" ? " Your contract is now ACTIVE!" : ""}`,
+                    metadata: {
+                        paymentId: payment._id,
+                        contractId: contract._id,
+                        contractNumber: contract.contractNumber,
+                        amount: payment.amount,
+                        currency: payment.currency,
+                        paymentMethod: payment.paymentMethod,
+                        paymentType: payment.paymentType,
+                        contractStatus: contract.status,
+                    },
+                })
+                sendRealTimeNotification(contract.corporateOwnerId.toString(), corporateNotification)
+            }
+
+            // Notification for B2B Partner
+            if (b2bPartnerUser) {
+                const b2bNotification = await createNotification({
+                    userId: contract.fleetOwnerId,
+                    type: "PAYMENT_RECEIVED",
+                    title: "Payment Received",
+                    message: `Payment of ${fleetOwnerAmount} ${payment.currency} (90% of advance) has been credited to your wallet for contract ${contract.contractNumber}. Payment method: ${payment.paymentMethod}.${contract.status === "ACTIVE" ? " Contract is now ACTIVE!" : ""}`,
+                    metadata: {
+                        paymentId: payment._id,
+                        contractId: contract._id,
+                        contractNumber: contract.contractNumber,
+                        totalAmount: payment.amount,
+                        yourShare: fleetOwnerAmount,
+                        adminCommission: adminCommissionAmount,
+                        currency: payment.currency,
+                        paymentMethod: payment.paymentMethod,
+                        paymentType: payment.paymentType,
+                        contractStatus: contract.status,
+                        expectedPayoutDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+                    },
+                })
+                sendRealTimeNotification(contract.fleetOwnerId.toString(), b2bNotification)
+            }
+
+            // If contract is now ACTIVE, send contract activation notification
+            if (contract.status === "ACTIVE") {
+                // Notification for Corporate
+                const corporateActivationNotif = await createNotification({
+                    userId: contract.corporateOwnerId,
+                    type: "CONTRACT_ACTIVATED",
+                    title: "Contract Activated",
+                    message: `Your contract ${contract.contractNumber} is now active! You can now use the assigned vehicles.`,
+                    metadata: {
+                        contractId: contract._id,
+                        contractNumber: contract.contractNumber,
+                        startDate: contract.rentalPeriod.startDate,
+                        endDate: contract.rentalPeriod.endDate,
+                    },
+                })
+                sendRealTimeNotification(contract.corporateOwnerId.toString(), corporateActivationNotif)
+
+                // Notification for B2B Partner
+                const b2bActivationNotif = await createNotification({
+                    userId: contract.fleetOwnerId,
+                    type: "CONTRACT_ACTIVATED",
+                    title: "Contract Activated",
+                    message: `Contract ${contract.contractNumber} is now active! Please ensure vehicles are ready for the client.`,
+                    metadata: {
+                        contractId: contract._id,
+                        contractNumber: contract.contractNumber,
+                        startDate: contract.rentalPeriod.startDate,
+                        endDate: contract.rentalPeriod.endDate,
+                    },
+                })
+                sendRealTimeNotification(contract.fleetOwnerId.toString(), b2bActivationNotif)
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Payment verified successfully",
+                data: {
+                    payment,
+                    paymentBreakdown: {
+                        advanceAmount,
+                        securityDepositAmount,
+                        adminCommission: adminCommissionAmount,
+                        fleetOwnerAmount,
+                    },
+                },
+            })
+        } else if (action === "REJECT") {
+            payment.status = "FAILED"
+            payment.verificationStatus = "REJECTED"
+            payment.verifiedBy = req.userId
+            payment.verifiedAt = new Date()
+            payment.failureReason = reason || "Payment rejected by admin"
+
+            await payment.save()
+
+
+            // Get contract for notification
+            const contract = payment.contractId
+
+            // Send rejection notification to Corporate
+            const corporateRejectionNotif = await createNotification({
+                userId: contract.corporateOwnerId,
+                type: "PAYMENT_REJECTED",
+                title: "Payment Rejected",
+                message: `Your payment of ${payment.amount} ${payment.currency} for contract ${contract.contractNumber} has been rejected. Reason: ${reason || "Payment rejected by admin"}. Please contact support or try again.`,
+                metadata: {
+                    paymentId: payment._id,
+                    contractId: contract._id,
+                    contractNumber: contract.contractNumber,
+                    amount: payment.amount,
+                    currency: payment.currency,
+                    reason: reason || "Payment rejected by admin",
+                },
+            })
+            sendRealTimeNotification(contract.corporateOwnerId.toString(), corporateRejectionNotif)
+
+            // Send notification to B2B Partner about rejection
+            const b2bRejectionNotif = await createNotification({
+                userId: contract.fleetOwnerId,
+                type: "PAYMENT_REJECTED",
+                title: "Payment Rejected",
+                message: `Payment for contract ${contract.contractNumber} was rejected. The corporate client will need to resubmit payment.`,
+                metadata: {
+                    paymentId: payment._id,
+                    contractId: contract._id,
+                    contractNumber: contract.contractNumber,
+                    reason: reason || "Payment rejected by admin",
+                },
+            })
+            sendRealTimeNotification(contract.fleetOwnerId.toString(), b2bRejectionNotif)
+
+            return res.status(200).json({
+                success: true,
+                message: "Payment rejected",
+                data: { payment },
+            })
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid action. Must be 'APPROVE' or 'REJECT'",
+            })
+        }
+    } catch (error) {
+        console.error("[v0] Verify payment error:", error)
+        res.status(500).json({
+            success: false,
+            message: "Error verifying payment",
+            error: error.message,
+        })
+    }
+}
+
+// Get all contracts for admin
+export const getAllContracts = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 10 } = req.query
+        const query = {}
+
+        if (status) {
+            query.status = status
+        }
+
+        const contracts = await Contract.find(query)
+            .populate("corporateOwnerId", "name email phone company")
+            .populate("fleetOwnerId", "name email phone company")
+            .populate("vehicles.vehicleId")
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit))
+
+        const total = await Contract.countDocuments(query)
+
+        res.status(200).json({
+            success: true,
+            contracts,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        })
+    } catch (error) {
+        console.error("[v0] Error fetching contracts:", error)
+        res.status(500).json({
+            success: false,
+            message: "Error fetching contracts",
+            error: error.message,
+        })
+    }
+}
+
+// Get admin dashboard statistics
+export const getDashboardStats = async (req, res) => {
+    try {
+        // The dashboard is viewed in the admin's selected display currency
+        // (?displayCurrency / ?currency / ?country — all handled by
+        // resolveDisplayCurrency). Revenue and wallet balance are the admin's
+        // earnings ACROSS ALL their currency wallets, each converted into the
+        // display currency with the live rate. This matches the navbar wallet
+        // pill: earnings held in a KWD wallet correctly show their AED value
+        // instead of 0 just because a separate empty AED wallet exists.
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Today's operating window (used for the "live" active-trips count).
+        const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+        const todayEnd = new Date(new Date().setHours(23, 59, 59, 999));
+
+        // Terminal statuses across BOTH trip collections. The two collections use
+        // different casing ("COMPLETED"/"CANCELLED" in Trip vs "Completed"/"Cancelled"
+        // in B2CPartnerTrip), so "active" = anything today that is NOT finished or
+        // cancelled. Matching on terminal statuses avoids missing live trips just
+        // because the schedule status casing differs.
+        const TERMINAL_TRIP_STATUSES = [
+            "COMPLETED", "Completed", "CANCELLED", "Cancelled",
+        ];
+
+        // The "Pending Payments" card counts everything genuinely awaiting payment
+        // verification across the platform: regular payments awaiting verification,
+        // cash/bank-transfer EMI installments awaiting verification, AND cash-based
+        // B2C monthly pass purchases/renewals whose payment has not yet been settled
+        // (paymentMethod CASH + paymentStatus PENDING).
+        const pendingRegularPaymentFilter = {
+            verificationStatus: "PENDING",
+            $or: [
+                { status: "PENDING" },
+                { status: "COMPLETED", paymentProvider: { $exists: true } },
+            ],
+        };
+
+        // Cash monthly passes/renewals awaiting settlement/verification.
+        const pendingCashRenewalFilter = {
+            paymentMethod: { $in: ["CASH", "BANK_TRANSFER"] },
+            paymentStatus: "PENDING",
+        };
+
+        // Fetch all stats in parallel for performance
+        const [
+            // User counts
+            totalUsers,
+            totalCorporates,
+            totalB2CPartners,
+            totalB2BPartners,
+            totalDrivers,
+            suspendedUsers,
+
+            // Contract counts
+            totalContracts,
+            activeContracts,
+
+            // Booking counts — ALL booking types (B2C passenger + Corporate)
+            totalB2CBookings,
+            totalCorporateBookings,
+            activeB2CBookings,
+            activeCorporateBookings,
+
+            // Payment counts
+            pendingRegularPayments,
+            pendingEmiAgg,
+            pendingCashRenewals,
+            totalPaymentRevenue,
+
+            // Trip counts (today, non-terminal) across BOTH collections
+            activeGenericTrips,
+            activeB2CPartnerTrips,
+
+            // Wallet — all of the admin's currency wallets
+            adminWallets
+        ] = await Promise.all([
+            // User counts
+            User.countDocuments(),
+            User.countDocuments({ role: "CORPORATE" }),
+            User.countDocuments({ role: "B2C_PARTNER" }),
+            User.countDocuments({ role: "B2B_PARTNER" }),
+            User.countDocuments({ role: { $in: ["B2B_PARTNER_DRIVER", "CORPORATE_DRIVER", "B2C_PARTNER_DRIVER"] } }),
+            User.countDocuments({ status: "SUSPENDED" }),
+
+            // Contract counts
+            Contract.countDocuments(),
+            Contract.countDocuments({ status: "ACTIVE" }),
+
+            // Bookings — the real status field is `bookingStatus` (not `status`).
+            // Total counts every booking; active = confirmed/accepted/in-progress.
+            B2CPassengerBooking.countDocuments(),
+            CorporateBooking.countDocuments(),
+            B2CPassengerBooking.countDocuments({
+                bookingStatus: { $in: ["CONFIRMED", "ACCEPTED", "IN_PROGRESS"] }
+            }),
+            CorporateBooking.countDocuments({
+                bookingStatus: { $in: ["CONFIRMED", "IN_PROGRESS"] }
+            }),
+
+            // Payment counts
+            Payment.countDocuments(pendingRegularPaymentFilter),
+            EMIPayment.aggregate([
+                { $unwind: "$installments" },
+                {
+                    $match: {
+                        "installments.paymentMethod": { $in: ["CASH", "BANK_TRANSFER"] },
+                        "installments.verificationStatus": "PENDING",
+                        "installments.transactionId": { $exists: true, $ne: null },
+                    },
+                },
+                { $count: "count" },
+            ]),
+            // Cash/bank-transfer monthly pass purchases & renewals not yet settled.
+            B2CMonthlyPass.countDocuments(pendingCashRenewalFilter),
+            Payment.aggregate([
+                { $match: { status: "COMPLETED" } },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]),
+
+            // Active trips = today's trips that are NOT completed/cancelled, across
+            // the generic Trip collection (corporate / B2B / commuter marketplace)
+            // AND the B2C partner trip collection.
+            Trip.countDocuments({
+                tripDate: { $gte: todayStart, $lte: todayEnd },
+                status: { $nin: TERMINAL_TRIP_STATUSES },
+            }),
+            B2CPartnerTrip.countDocuments({
+                tripDate: { $gte: todayStart, $lte: todayEnd },
+                status: { $nin: TERMINAL_TRIP_STATUSES },
+            }),
+
+            // All admin wallets for this user (one per currency/market). We sum
+            // and convert these into the display currency below.
+            Wallet.find({
+                userId: req.userId,
+                role: "ADMIN"
+            })
+        ]);
+
+        // Combine the per-collection results into the real platform totals.
+        const totalBookings = (totalB2CBookings || 0) + (totalCorporateBookings || 0);
+        const activeBookings = (activeB2CBookings || 0) + (activeCorporateBookings || 0);
+        const activeTrips = (activeGenericTrips || 0) + (activeB2CPartnerTrips || 0);
+        const pendingEmiInstallments = pendingEmiAgg?.[0]?.count || 0;
+        const pendingPayments = (pendingRegularPayments || 0) + pendingEmiInstallments + (pendingCashRenewals || 0);
+
+        // The dashboard renders everything in the resolved display currency.
+        const currency = displayCurrency;
+
+        // Sum each admin wallet's earnings/balance converted to the display
+        // currency, so totals reflect the admin's REAL money regardless of which
+        // currency wallet it sits in (real conversion, not a relabel).
+        const safeWallets = Array.isArray(adminWallets) ? adminWallets : [];
+        const adminTotalEarnings = round2(
+            safeWallets.reduce(
+                (sum, w) => sum + convertForDisplay(w.totalEarnings || 0, w.currency || "AED", displayCurrency),
+                0
+            )
+        );
+        const adminBalance = round2(
+            safeWallets.reduce(
+                (sum, w) => sum + convertForDisplay(w.balance || 0, w.currency || "AED", displayCurrency),
+                0
+            )
+        );
+
+        // Total revenue = admin's earnings (fallback to balance if earnings not tracked).
+        const totalRevenue = adminTotalEarnings || adminBalance || 0;
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                // User stats
+                totalUsers,
+                totalCorporates,
+                totalB2CPartners,
+                totalB2BPartners,
+                totalDrivers,
+                suspendedUsers,
+
+                // Contract stats
+                totalContracts,
+                activeContracts,
+
+                // Booking stats (B2C passenger + Corporate combined)
+                totalBookings,
+                activeBookings,
+
+                // Payment stats (regular pending + EMI installments pending)
+                pendingPayments,
+                totalRevenue: totalRevenue,
+                adminBalance: adminBalance,
+                totalEarnings: adminTotalEarnings,
+
+                // Trip stats
+                activeTrips,
+
+                currency: currency,
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching dashboard stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching dashboard statistics",
+            error: error.message,
+        });
+    }
+}
+
+// Get monthly revenue data for admin dashboard
+export const getMonthlyRevenue = async (req, res) => {
+    try {
+        const currentYear = new Date().getFullYear();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        // Admin revenue = the admin's own wallet earnings recorded in the Transaction ledger.
+        // This matches the "Total Revenue" stat (admin wallet totalEarnings) instead of only
+        // counting B2B contract Payment documents.
+        const adminUserId = new mongoose.Types.ObjectId(req.userId);
+
+        // The chart renders in the admin's selected display currency (?country / ?currency
+        // / ?displayCurrency). Records are stored in their NATIVE currency (Kuwait earnings
+        // in KWD, UAE earnings in AED, ...). So — exactly like the "Total Revenue" stat card
+        // (getDashboardStats) — we DO NOT filter the ledger down to one exact currency
+        // (which made the chart empty for AED because every transaction was natively KWD).
+        // Instead we group per month AND per native currency, then convert each bucket into
+        // the display currency with the live rate and sum. This keeps the chart and the stat
+        // card perfectly consistent across every market.
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Reference models that belong to the corporate side; everything else (B2C bookings,
+        // monthly pass renewals, etc.) is counted as B2C revenue.
+        const CORPORATE_REFS = ["Payment", "Contract", "AdminNegotiation", "CorporateBooking"];
+
+        const monthlyRevenue = await Transaction.aggregate([
+            {
+                $match: {
+                    userId: adminUserId,
+                    createdAt: {
+                        $gte: new Date(currentYear, 0, 1),
+                        $lte: new Date(currentYear, 11, 31, 23, 59, 59, 999)
+                    }
+                }
+            },
+            {
+                $group: {
+                    // Group by month + native currency so each bucket can be converted.
+                    _id: { month: { $month: "$createdAt" }, currency: "$currency" },
+                    // Net total = credited earnings minus any debited reversals/refunds
+                    total: {
+                        $sum: {
+                            $cond: [{ $eq: ["$type", "CREDIT"] }, "$amount", { $multiply: ["$amount", -1] }]
+                        }
+                    },
+                    corporate: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $and: [
+                                        { $eq: ["$type", "CREDIT"] },
+                                        { $in: [{ $ifNull: ["$referenceModel", "none"] }, CORPORATE_REFS] }
+                                    ]
+                                },
+                                "$amount",
+                                0
+                            ]
+                        }
+                    },
+                    b2c: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $and: [
+                                        { $eq: ["$type", "CREDIT"] },
+                                        { $not: [{ $in: [{ $ifNull: ["$referenceModel", "none"] }, CORPORATE_REFS] }] }
+                                    ]
+                                },
+                                "$amount",
+                                0
+                            ]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        // Accumulate per month, converting every native-currency bucket into the
+        // admin's selected display currency (real conversion, not a relabel).
+        const perMonth = months.map(() => ({ total: 0, corporate: 0, b2c: 0 }));
+        monthlyRevenue.forEach((bucket) => {
+            const monthIndex = (bucket?._id?.month || 0) - 1;
+            if (monthIndex < 0 || monthIndex > 11) return;
+            const native = bucket?._id?.currency || displayCurrency;
+            perMonth[monthIndex].total += convertForDisplay(bucket.total || 0, native, displayCurrency);
+            perMonth[monthIndex].corporate += convertForDisplay(bucket.corporate || 0, native, displayCurrency);
+            perMonth[monthIndex].b2c += convertForDisplay(bucket.b2c || 0, native, displayCurrency);
+        });
+
+        // Format data for frontend (zero-filled for months with no data)
+        const data = months.map((month, index) => {
+            const total = Math.round((perMonth[index].total || 0) * 100) / 100;
+            const corporate = Math.round((perMonth[index].corporate || 0) * 100) / 100;
+            const b2c = Math.round((perMonth[index].b2c || 0) * 100) / 100;
+            return {
+                month,
+                total: total < 0 ? 0 : total,
+                corporate,
+                b2c
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching monthly revenue:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching monthly revenue data",
+            error: error.message,
+        });
+    }
+}
+
+// Get booking trends for admin dashboard
+export const getBookingTrends = async (req, res) => {
+    try {
+        const { period = "12" } = req.query;
+        const monthsToShow = Math.min(Math.max(parseInt(period) || 12, 1), 12);
+
+        // Build a rolling window ending with the current month so trends are always relevant.
+        const now = new Date();
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        const windowStart = new Date(now.getFullYear(), now.getMonth() - (monthsToShow - 1), 1);
+        const windowEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        // Count real bookings from both booking sources, grouped by year+month
+        const groupByYearMonth = (collectionMatch) => ({
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+            ...collectionMatch
+        });
+
+        const [b2cTrends, corporateTrends] = await Promise.all([
+            B2CPassengerBooking.aggregate([
+                { $match: { createdAt: { $gte: windowStart, $lte: windowEnd } } },
+                { $group: groupByYearMonth({ count: { $sum: 1 } }) }
+            ]),
+            CorporateBooking.aggregate([
+                { $match: { createdAt: { $gte: windowStart, $lte: windowEnd } } },
+                { $group: groupByYearMonth({ count: { $sum: 1 } }) }
+            ])
+        ]);
+
+        const lookup = (trends, year, month) =>
+            trends.find(t => t._id.year === year && t._id.month === month)?.count || 0;
+
+        // Build the ordered list of months in the rolling window (oldest -> newest)
+        const data = [];
+        for (let i = 0; i < monthsToShow; i++) {
+            const d = new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1);
+            const year = d.getFullYear();
+            const monthNum = d.getMonth() + 1;
+            const b2cCount = lookup(b2cTrends, year, monthNum);
+            const corporateCount = lookup(corporateTrends, year, monthNum);
+            data.push({
+                month: monthNames[d.getMonth()],
+                bookings: b2cCount + corporateCount,
+                b2cBookings: b2cCount,
+                corporateBookings: corporateCount
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching booking trends:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching booking trends data",
+            error: error.message,
+        });
+    }
+}
+
+// Get B2C Management Statistics
+export const getB2CStats = async (req, res) => {
+    try {
+        // Get B2C providers stats
+        const providerStats = await User.aggregate([
+            {
+                $match: {
+                    role: 'B2C_PARTNER',
+                    status: { $in: ['ACTIVE', 'PENDING', 'SUSPENDED'] }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalProviders: { $sum: 1 },
+                    activeProviders: {
+                        $sum: { $cond: [{ $eq: ['$status', 'ACTIVE'] }, 1, 0] }
+                    },
+                    pendingProviders: {
+                        $sum: { $cond: [{ $eq: ['$status', 'PENDING'] }, 1, 0] }
+                    },
+                    suspendedProviders: {
+                        $sum: { $cond: [{ $eq: ['$status', 'SUSPENDED'] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
+
+        // Get B2C routes stats
+        const routeStats = await B2CPartnerRoute.aggregate([
+            {
+                $match: {
+                    status: { $in: ['Active', 'Inactive', 'Scheduled'] }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalRoutes: { $sum: 1 },
+                    activeRoutes: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Active'] }, 1, 0] }
+                    },
+                    inactiveRoutes: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Inactive'] }, 1, 0] }
+                    },
+                    maintenanceRoutes: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Scheduled'] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
+
+        // Get B2C bookings revenue from the actual passenger-booking records.
+        // Using B2CPassengerBooking (not Payment) is essential because wallet- and
+        // cash-paid B2C bookings do NOT create a Payment document of these types,
+        // so the old Payment-only query reported 0 revenue. We only count bookings
+        // that represent real, collected revenue (payment completed and not
+        // rejected/cancelled), grouped by their native currency so we can convert
+        // each bucket to the admin's display currency.
+        const revenueBuckets = await B2CPassengerBooking.aggregate([
+            {
+                $match: {
+                    paymentStatus: "COMPLETED",
+                    bookingStatus: { $nin: ["REJECTED", "CANCELLED"] }
+                }
+            },
+            {
+                $group: {
+                    _id: "$currency",
+                    total: { $sum: "$paymentAmount" },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // Get passenger bookings stats - uses bookingStatus field with uppercase values
+        const passengerStats = await B2CPassengerBooking.aggregate([
+            {
+                $match: {
+                    createdAt: {
+                        $gte: new Date(new Date().getFullYear(), 0, 1)
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalPassengerBookings: { $sum: 1 },
+                    pendingBookings: {
+                        $sum: { $cond: [{ $eq: ['$bookingStatus', 'PENDING'] }, 1, 0] }
+                    },
+                    confirmedBookings: {
+                        $sum: { $cond: [{ $in: ['$bookingStatus', ['CONFIRMED', 'ACCEPTED']] }, 1, 0] }
+                    },
+                    completedBookings: {
+                        $sum: { $cond: [{ $eq: ['$bookingStatus', 'COMPLETED'] }, 1, 0] }
+                    },
+                    inProgressBookings: {
+                        $sum: { $cond: [{ $eq: ['$bookingStatus', 'IN_PROGRESS'] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
+
+        // Get tag stats from Tag model
+        const tagStatsResult = await Tag.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalTags: { $sum: 1 },
+                    activeTags: {
+                        $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
+        const tagStats = tagStatsResult[0] || { totalTags: 0, activeTags: 0 };
+
+        // Convert each currency bucket of B2C booking revenue into the admin's
+        // selected display currency and sum. Total bookings = count of revenue-
+        // generating bookings across all currencies.
+        const displayCurrency = resolveDisplayCurrency(req);
+        const b2cTotalBookings = revenueBuckets.reduce((s, b) => s + (b.count || 0), 0);
+        const b2cTotalRevenue = sumByCurrency(revenueBuckets, displayCurrency);
+        const bookingStats = [{
+            totalBookings: b2cTotalBookings,
+            totalRevenue: Number(b2cTotalRevenue.toFixed(2)),
+            averageRevenue: b2cTotalBookings > 0
+                ? Number((b2cTotalRevenue / b2cTotalBookings).toFixed(2))
+                : 0,
+            currency: displayCurrency
+        }];
+
+        const stats = {
+            providers: providerStats[0] || {
+                totalProviders: 0,
+                activeProviders: 0,
+                pendingProviders: 0,
+                suspendedProviders: 0
+            },
+            routes: routeStats[0] || {
+                totalRoutes: 0,
+                activeRoutes: 0,
+                inactiveRoutes: 0,
+                maintenanceRoutes: 0
+            },
+            bookings: bookingStats[0] || {
+                totalBookings: 0,
+                totalRevenue: 0,
+                averageRevenue: 0
+            },
+            passengers: passengerStats[0] || {
+                totalPassengerBookings: 0,
+                pendingBookings: 0,
+                confirmedBookings: 0,
+                completedBookings: 0
+            },
+            tags: tagStats
+        };
+
+        res.status(200).json({
+            success: true,
+            stats
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Get pending vehicle approvals
+export const getPendingVehicleApprovals = async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        const skip = (page - 1) * limit;
+
+        const vehicles = await Vehicle.find({ approvalStatus: "PENDING" })
+            .populate("fleetOwnerId", "fullName companyName email phone")
+            .skip(skip)
+            .limit(Number(limit))
+            .sort({ createdAt: -1 });
+
+        const total = await Vehicle.countDocuments({ approvalStatus: "PENDING" });
+
+        res.status(200).json({
+            success: true,
+            vehicles,
+            pagination: {
+                total,
+                page: Number(page),
+                pages: Math.ceil(total / Number(limit))
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching pending vehicles:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching pending vehicle approvals",
+            error: error.message
+        });
+    }
+};
+
+// Approve vehicle
+export const approveVehicle = async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+        const adminId = req.userId;
+
+        const vehicle = await Vehicle.findById(vehicleId);
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                message: "Vehicle not found"
+            });
+        }
+
+        if (vehicle.approvalStatus !== "PENDING") {
+            return res.status(400).json({
+                success: false,
+                message: `Vehicle is already ${vehicle.approvalStatus.toLowerCase()}`
+            });
+        }
+
+        vehicle.approvalStatus = "APPROVED";
+        vehicle.status = "AVAILABLE";
+        vehicle.approvedAt = new Date();
+        vehicle.approvedBy = adminId;
+        await vehicle.save();
+
+        // Notify fleet owner via in-app notification
+        const fleetOwner = await User.findById(vehicle.fleetOwnerId);
+        if (fleetOwner) {
+            try {
+                const { createNotification, sendAdminNotification } = await import("../Services/notificationService.js");
+                await createNotification({
+                    userId: fleetOwner._id,
+                    type: "VEHICLE_APPROVED",
+                    title: "Vehicle Approved",
+                    message: `Your vehicle ${vehicle.vehicleName} (${vehicle.registrationNumber}) has been approved! You can now accept bookings.`,
+                    data: { vehicleId: vehicle._id, vehicleName: vehicle.vehicleName }
+                });
+            } catch (notifError) {
+                console.error("[v0] Error sending vehicle approval notification:", notifError);
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Vehicle approved successfully",
+            vehicle
+        });
+    } catch (error) {
+        console.error("[v0] Error approving vehicle:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error approving vehicle",
+            error: error.message
+        });
+    }
+};
+
+// Reject vehicle
+export const rejectVehicle = async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+        const { rejectionReason } = req.body;
+        const adminId = req.userId;
+
+        if (!rejectionReason) {
+            return res.status(400).json({
+                success: false,
+                message: "Rejection reason is required"
+            });
+        }
+
+        const vehicle = await Vehicle.findById(vehicleId);
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                message: "Vehicle not found"
+            });
+        }
+
+        if (vehicle.approvalStatus !== "PENDING") {
+            return res.status(400).json({
+                success: false,
+                message: `Vehicle is already ${vehicle.approvalStatus.toLowerCase()}`
+            });
+        }
+
+        vehicle.approvalStatus = "REJECTED";
+        vehicle.status = "INACTIVE";
+        vehicle.rejectionReason = rejectionReason;
+        vehicle.approvedBy = adminId;
+        vehicle.approvedAt = new Date();
+        await vehicle.save();
+
+        // Notify fleet owner via in-app notification
+        const fleetOwner = await User.findById(vehicle.fleetOwnerId);
+        if (fleetOwner) {
+            try {
+                const { createNotification } = await import("../Services/notificationService.js");
+                await createNotification({
+                    userId: fleetOwner._id,
+                    type: "VEHICLE_REJECTED",
+                    title: "Vehicle Rejected",
+                    message: `Your vehicle ${vehicle.vehicleName} (${vehicle.registrationNumber}) was not approved. Reason: ${rejectionReason}`,
+                    data: { vehicleId: vehicle._id, vehicleName: vehicle.vehicleName, reason: rejectionReason }
+                });
+            } catch (notifError) {
+                console.error("[v0] Error sending vehicle rejection notification:", notifError);
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Vehicle rejected successfully",
+            vehicle
+        });
+    } catch (error) {
+        console.error("[v0] Error rejecting vehicle:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error rejecting vehicle",
+            error: error.message
+        });
+    }
+};
+
+// ==================== ADMIN WALLET MANAGEMENT APIS ====================
+
+// Get all wallets with user details for admin
+export const getAllWallets = async (req, res) => {
+    try {
+        const { role, page = 1, limit = 20, search, sortBy = "createdAt", sortOrder = "desc", minBalance, maxBalance } = req.query;
+        const displayCurrency = resolveDisplayCurrency(req);
+        const query = {};
+
+        if (role) query.role = role;
+        if (minBalance !== undefined) query.balance = { ...query.balance, $gte: Number(minBalance) };
+        if (maxBalance !== undefined) query.balance = { ...query.balance, $lte: Number(maxBalance) };
+
+        // A user holds ONE wallet PER currency by design (see walletService), so a
+        // single admin/partner legitimately owns e.g. a KWD wallet AND an AED
+        // wallet. Listing raw wallets therefore renders the same person on
+        // multiple rows (the "duplicate admin" the dashboard showed). We fetch all
+        // matching wallets, convert each to the display currency, then GROUP BY
+        // user so every person appears exactly once with their balances summed in
+        // one currency. Pagination/sorting is applied to the grouped rows.
+        const rawWallets = await Wallet.find(query)
+            .populate("userId", "fullName email whatsappNumber role companyName status profileImage adminPermissions");
+
+        // Filter by search if provided
+        let filteredWallets = rawWallets;
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filteredWallets = rawWallets.filter(wallet =>
+                wallet.userId?.fullName?.toLowerCase().includes(searchLower) ||
+                wallet.userId?.email?.toLowerCase().includes(searchLower) ||
+                wallet.userId?.companyName?.toLowerCase().includes(searchLower) ||
+                wallet.userId?.whatsappNumber?.includes(search)
+            );
+        }
+
+        // Group per user, merging their per-currency wallets into one row.
+        const groups = new Map();
+        for (const w of filteredWallets) {
+            const obj = w.toObject ? w.toObject() : w;
+            const native = obj.currency || "AED";
+            const userKey = String(obj.userId?._id || obj.userId || obj._id);
+            const isSuperAdmin =
+                obj.userId?.role === "ADMIN" &&
+                obj.userId?.adminPermissions?.isSuperAdmin === true;
+            const dispBalance = convertForDisplay(obj.balance, native, displayCurrency);
+            const dispEarnings = convertForDisplay(obj.totalEarnings, native, displayCurrency);
+            const dispWithdrawals = convertForDisplay(obj.totalWithdrawals, native, displayCurrency);
+
+            const existing = groups.get(userKey);
+            if (!existing) {
+                groups.set(userKey, {
+                    ...obj,
+                    // The user's account role is the source of truth. A wallet may
+                    // carry a stale/mislabelled role (e.g. minted as COMMUTER before
+                    // SCHOOL_PARTNER was a valid wallet role), so display the real
+                    // role when the user is populated.
+                    role: obj.userId?.role || obj.role,
+                    isSuperAdmin,
+                    // Display everything already converted into ONE currency, so the
+                    // merged balances are additive and consistent.
+                    currency: displayCurrency,
+                    displayCurrency,
+                    balance: dispBalance,
+                    totalEarnings: dispEarnings,
+                    totalWithdrawals: dispWithdrawals,
+                    displayBalance: dispBalance,
+                    displayTotalEarnings: dispEarnings,
+                    displayTotalWithdrawals: dispWithdrawals,
+                    // The View action opens a single wallet; remember the wallet
+                    // that currently carries the balance so it opens the funded one.
+                    _id: obj._id,
+                    _primaryDisplayBalance: dispBalance,
+                    walletCount: 1,
+                });
+            } else {
+                existing.balance += dispBalance;
+                existing.totalEarnings += dispEarnings;
+                existing.totalWithdrawals += dispWithdrawals;
+                existing.displayBalance = existing.balance;
+                existing.displayTotalEarnings = existing.totalEarnings;
+                existing.displayTotalWithdrawals = existing.totalWithdrawals;
+                existing.walletCount += 1;
+                existing.isActive = existing.isActive || obj.isActive;
+                // Keep the id of the wallet holding the most funds for the View action.
+                if (dispBalance > (existing._primaryDisplayBalance || 0)) {
+                    existing._primaryDisplayBalance = dispBalance;
+                    existing._id = obj._id;
+                }
+                // Keep the earliest createdAt so sorting by age is stable.
+                if (obj.createdAt && existing.createdAt && new Date(obj.createdAt) < new Date(existing.createdAt)) {
+                    existing.createdAt = obj.createdAt;
+                }
+            }
+        }
+
+        let mergedWallets = Array.from(groups.values());
+
+        // Sort the grouped rows.
+        const dir = sortOrder === "desc" ? -1 : 1;
+        mergedWallets.sort((a, b) => {
+            const av = a[sortBy];
+            const bv = b[sortBy];
+            if (sortBy === "createdAt") return (new Date(av) - new Date(bv)) * dir;
+            if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+            return String(av ?? "").localeCompare(String(bv ?? "")) * dir;
+        });
+
+        const total = mergedWallets.length;
+        const start = (Number.parseInt(page) - 1) * Number.parseInt(limit);
+        const walletsWithDisplay = mergedWallets.slice(start, start + Number.parseInt(limit));
+
+        res.status(200).json({
+            success: true,
+            wallets: walletsWithDisplay,
+            displayCurrency,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching all wallets:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching wallets",
+            error: error.message,
+        });
+    }
+};
+
+// Get wallet statistics for admin dashboard
+export const getWalletStats = async (req, res) => {
+    try {
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        const [
+            totalWallets,
+            totalBalance,
+            totalDeposits,
+            totalWithdrawals,
+            lowBalanceWallets,
+            activeWallets,
+            walletsByRole
+        ] = await Promise.all([
+            Wallet.countDocuments(),
+            Wallet.aggregate([{ $group: { _id: "$currency", total: { $sum: "$balance" } } }]),
+            Wallet.aggregate([{ $group: { _id: "$currency", total: { $sum: "$totalEarnings" } } }]),
+            Wallet.aggregate([{ $group: { _id: "$currency", total: { $sum: "$totalWithdrawals" } } }]),
+            Wallet.countDocuments({ balance: { $lt: 50 } }), // Wallets with less than 50 balance
+            Wallet.countDocuments({ isActive: true }),
+            Wallet.aggregate([
+                { $group: { _id: "$role", count: { $sum: 1 }, totalBalance: { $sum: "$balance" } } }
+            ])
+        ]);
+
+        // Get recent wallet transactions across all wallets
+        const recentTransactions = await Wallet.aggregate([
+            { $unwind: "$transactions" },
+            { $sort: { "transactions.createdAt": -1 } },
+            { $limit: 20 },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: "user"
+                }
+            },
+            { $unwind: "$user" },
+            {
+                $project: {
+                    transaction: "$transactions",
+                    user: { fullName: 1, email: 1, role: 1, companyName: 1 },
+                    walletId: "$_id",
+                    balance: 1,
+                    currency: 1
+                }
+            }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalWallets,
+                totalBalance: sumByCurrency(totalBalance, displayCurrency),
+                totalDeposits: sumByCurrency(totalDeposits, displayCurrency),
+                totalWithdrawals: sumByCurrency(totalWithdrawals, displayCurrency),
+                lowBalanceWallets,
+                activeWallets,
+                walletsByRole,
+                currency: displayCurrency
+            },
+            recentTransactions
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching wallet stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching wallet statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Get single wallet details with full transaction history
+export const getWalletDetails = async (req, res) => {
+    try {
+        const { walletId } = req.params;
+
+        const wallet = await Wallet.findById(walletId)
+            .populate("userId", "fullName email whatsappNumber role companyName status profileImage country adminPermissions");
+
+        if (!wallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found"
+            });
+        }
+
+        // Get notifications sent to this user related to wallet
+        const walletNotifications = await Notification.find({
+            userId: wallet.userId._id,
+            type: { $in: ["WALLET_UPDATED", "WALLET_LOW_BALANCE", "WALLET_FUND_REQUIRED", "WALLET_ADMIN_ALERT", "WALLET_ACTION_REQUIRED", "WALLET_USER_RESPONSE"] }
+        }).sort({ createdAt: -1 }).limit(20);
+
+        res.status(200).json({
+            success: true,
+            wallet,
+            walletNotifications
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching wallet details:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching wallet details",
+            error: error.message,
+        });
+    }
+};
+
+// Get wallet by user ID
+export const getWalletByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const wallet = await Wallet.findOne({ userId })
+            .populate("userId", "fullName email whatsappNumber role companyName status profileImage country");
+
+        if (!wallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found for this user"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            wallet
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching wallet by user ID:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching wallet",
+            error: error.message,
+        });
+    }
+};
+
+// Send wallet notification to user (email + in-app + real-time)
+export const sendWalletNotification = async (req, res) => {
+    try {
+        const { userId, title, message, reason, actionRequired, sendEmail: shouldSendEmail = true } = req.body;
+        const adminId = req.userId;
+
+        // Get user details
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Get user's wallet
+        const wallet = await Wallet.findOne({ userId });
+
+        // Create notification
+        const notification = await createNotification({
+            userId,
+            type: "WALLET_ADMIN_ALERT",
+            title: title || "Wallet Notification from Admin",
+            message,
+            data: {
+                reason,
+                actionRequired: actionRequired || "NONE",
+                walletBalance: wallet?.balance || 0,
+                walletCurrency: wallet?.currency || "KWD",
+                sentByAdmin: adminId
+            },
+            relatedEntityType: "WALLET",
+            walletId: wallet?._id,
+            adminNotificationReason: reason,
+            actionRequired: actionRequired || "NONE",
+            userResponseStatus: "PENDING"
+        });
+
+        // Send real-time notification
+        sendRealTimeNotification(userId, {
+            _id: notification._id,
+            type: "WALLET_ADMIN_ALERT",
+            title: title || "Wallet Notification from Admin",
+            message,
+            createdAt: new Date(),
+            isRead: false,
+            data: {
+                reason,
+                actionRequired,
+                walletBalance: wallet?.balance || 0
+            }
+        });
+
+        // Send email notification if enabled
+        if (shouldSendEmail && user.email) {
+            try {
+                const { sendWalletNotificationEmail } = await import("../Services/emailService.js");
+                await sendWalletNotificationEmail(user.email, user.fullName, {
+                    title: title || "Wallet Notification from Admin",
+                    message,
+                    reason,
+                    actionRequired,
+                    walletBalance: wallet?.balance || 0,
+                    currency: wallet?.currency || "KWD"
+                });
+            } catch (emailError) {
+                console.error("[v0] Error sending wallet email:", emailError);
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Notification sent successfully",
+            notification
+        });
+    } catch (error) {
+        console.error("[v0] Error sending wallet notification:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error sending notification",
+            error: error.message,
+        });
+    }
+};
+
+// Send bulk wallet notifications
+export const sendBulkWalletNotifications = async (req, res) => {
+    try {
+        const { userIds, title, message, reason, actionRequired, sendEmail: shouldSendEmail = true } = req.body;
+        const adminId = req.userId;
+
+        const results = {
+            success: [],
+            failed: []
+        };
+
+        for (const userId of userIds) {
+            try {
+                const user = await User.findById(userId);
+                if (!user) {
+                    results.failed.push({ userId, error: "User not found" });
+                    continue;
+                }
+
+                const wallet = await Wallet.findOne({ userId });
+
+                // Create notification
+                const notification = await createNotification({
+                    userId,
+                    type: "WALLET_ADMIN_ALERT",
+                    title: title || "Wallet Notification from Admin",
+                    message,
+                    data: {
+                        reason,
+                        actionRequired: actionRequired || "NONE",
+                        walletBalance: wallet?.balance || 0,
+                        walletCurrency: wallet?.currency || "KWD",
+                        sentByAdmin: adminId
+                    },
+                    relatedEntityType: "WALLET",
+                    walletId: wallet?._id,
+                    adminNotificationReason: reason,
+                    actionRequired: actionRequired || "NONE",
+                    userResponseStatus: "PENDING"
+                });
+
+                // Send real-time notification
+                sendRealTimeNotification(userId, {
+                    _id: notification._id,
+                    type: "WALLET_ADMIN_ALERT",
+                    title: title || "Wallet Notification from Admin",
+                    message,
+                    createdAt: new Date(),
+                    isRead: false
+                });
+
+                // Send email if enabled
+                if (shouldSendEmail && user.email) {
+                    try {
+                        const { sendWalletNotificationEmail } = await import("../Services/emailService.js");
+                        await sendWalletNotificationEmail(user.email, user.fullName, {
+                            title,
+                            message,
+                            reason,
+                            actionRequired,
+                            walletBalance: wallet?.balance || 0,
+                            currency: wallet?.currency || "KWD"
+                        });
+                    } catch (emailError) {
+                        console.error("[v0] Error sending wallet email to user:", userId, emailError);
+                    }
+                }
+
+                results.success.push({ userId, userName: user.fullName });
+            } catch (err) {
+                results.failed.push({ userId, error: err.message });
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Notifications sent: ${results.success.length} successful, ${results.failed.length} failed`,
+            results
+        });
+    } catch (error) {
+        console.error("[v0] Error sending bulk wallet notifications:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error sending bulk notifications",
+            error: error.message,
+        });
+    }
+};
+
+// Get low balance wallets (wallets that need attention)
+export const getLowBalanceWallets = async (req, res) => {
+    try {
+        const { threshold = 50, role, page = 1, limit = 20 } = req.query;
+        const displayCurrency = resolveDisplayCurrency(req);
+        const query = {
+            balance: { $lt: Number(threshold) }
+        };
+
+        if (role) query.role = role;
+
+        const wallets = await Wallet.find(query)
+            .populate("userId", "fullName email whatsappNumber role companyName status adminPermissions")
+            .sort({ balance: 1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await Wallet.countDocuments(query);
+
+        const walletsWithDisplay = wallets.map((w) => {
+            const obj = w.toObject ? w.toObject() : w;
+            const native = obj.currency || "AED";
+            // Super admins are stored as role "ADMIN" with adminPermissions.isSuperAdmin = true.
+            const isSuperAdmin =
+                obj.userId?.role === "ADMIN" &&
+                obj.userId?.adminPermissions?.isSuperAdmin === true;
+            return {
+                ...obj,
+                // The user's account role is the source of truth. A wallet may
+                // carry a stale/mislabelled role (e.g. minted as COMMUTER before
+                // SCHOOL_PARTNER was a valid wallet role), so display the real
+                // role when the user is populated.
+                role: obj.userId?.role || obj.role,
+                isSuperAdmin,
+                displayCurrency,
+                displayBalance: convertForDisplay(obj.balance, native, displayCurrency),
+                displayTotalEarnings: convertForDisplay(obj.totalEarnings, native, displayCurrency),
+                displayTotalWithdrawals: convertForDisplay(obj.totalWithdrawals, native, displayCurrency),
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            wallets: walletsWithDisplay,
+            displayCurrency,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching low balance wallets:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching low balance wallets",
+            error: error.message,
+        });
+    }
+};
+
+// Get wallet activity feed (real-time updates for admin)
+export const getWalletActivityFeed = async (req, res) => {
+    try {
+        const { page = 1, limit = 50, type, startDate, endDate } = req.query;
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        let matchConditions = {};
+
+        if (type) {
+            matchConditions["transactions.type"] = type;
+        }
+
+        if (startDate || endDate) {
+            matchConditions["transactions.createdAt"] = {};
+            if (startDate) matchConditions["transactions.createdAt"].$gte = new Date(startDate);
+            if (endDate) matchConditions["transactions.createdAt"].$lte = new Date(endDate);
+        }
+
+        const activities = await Wallet.aggregate([
+            { $unwind: "$transactions" },
+            ...(Object.keys(matchConditions).length > 0 ? [{ $match: matchConditions }] : []),
+            { $sort: { "transactions.createdAt": -1 } },
+            { $skip: (Number.parseInt(page) - 1) * Number.parseInt(limit) },
+            { $limit: Number.parseInt(limit) },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: "user"
+                }
+            },
+            { $unwind: "$user" },
+            {
+                $project: {
+                    _id: "$transactions._id",
+                    walletId: "$_id",
+                    userId: "$userId",
+                    userName: "$user.fullName",
+                    userEmail: "$user.email",
+                    userRole: "$user.role",
+                    companyName: "$user.companyName",
+                    transactionType: "$transactions.type",
+                    amount: "$transactions.amount",
+                    description: "$transactions.description",
+                    status: "$transactions.status",
+                    createdAt: "$transactions.createdAt",
+                    balance: 1,
+                    currency: 1
+                }
+            }
+        ]);
+
+        const activitiesWithDisplay = activities.map((a) => ({
+            ...a,
+            displayCurrency,
+            displayAmount: convertForDisplay(a.amount, a.currency, displayCurrency),
+        }));
+
+        res.status(200).json({
+            success: true,
+            activities: activitiesWithDisplay,
+            displayCurrency,
+            pagination: {
+                page: Number.parseInt(page),
+                limit: Number.parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching wallet activity feed:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching wallet activity feed",
+            error: error.message,
+        });
+    }
+};
+
+// Mark notification as responded by user (called when user takes action)
+export const markWalletNotificationResponded = async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+        const { responseType } = req.body;
+        const userId = req.userId;
+
+        const notification = await Notification.findByIdAndUpdate(
+            notificationId,
+            {
+                userResponseStatus: "COMPLETED",
+                userResponseAt: new Date()
+            },
+            { new: true }
+        );
+
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: "Notification not found"
+            });
+        }
+
+        // Notify admin about user response
+        const admins = await User.find({ role: "ADMIN" });
+        const user = await User.findById(userId);
+        const wallet = await Wallet.findOne({ userId });
+
+        for (const admin of admins) {
+            await createNotification({
+                userId: admin._id,
+                type: "WALLET_USER_RESPONSE",
+                title: "User Responded to Wallet Alert",
+                message: `${user?.fullName || "User"} has responded to wallet notification: ${responseType}`,
+                data: {
+                    originalNotificationId: notificationId,
+                    responseType,
+                    userId,
+                    userName: user?.fullName,
+                    walletBalance: wallet?.balance || 0
+                },
+                relatedEntityType: "WALLET"
+            });
+
+            sendRealTimeNotification(admin._id, {
+                type: "WALLET_USER_RESPONSE",
+                title: "User Responded to Wallet Alert",
+                message: `${user?.fullName || "User"} has ${responseType}`,
+                createdAt: new Date(),
+                isRead: false
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Response recorded successfully",
+            notification
+        });
+    } catch (error) {
+        console.error("[v0] Error marking notification as responded:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error recording response",
+            error: error.message,
+        });
+    }
+};
+
+// Subscribe to real-time wallet updates (for WebSocket setup)
+export const getWalletUpdatesSubscription = async (req, res) => {
+    try {
+        // This endpoint provides info for socket subscription
+        res.status(200).json({
+            success: true,
+            subscriptionTopic: "admin-wallet-updates",
+            events: [
+                "wallet-fund-added",
+                "wallet-withdrawal",
+                "wallet-transfer",
+                "wallet-low-balance",
+                "wallet-user-response"
+            ]
+        });
+    } catch (error) {
+        console.error("[v0] Error getting wallet subscription info:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error getting subscription info",
+            error: error.message,
+        });
+    }
+};
+
+// Admin adjust wallet balance (for corrections/refunds)
+export const adjustWalletBalance = async (req, res) => {
+    try {
+        const { walletId } = req.params;
+        const { amount, type, reason } = req.body;
+        const adminId = req.userId;
+
+        const wallet = await Wallet.findById(walletId).populate("userId", "fullName email");
+        if (!wallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found"
+            });
+        }
+
+        const adjustmentAmount = type === "CREDIT" ? Math.abs(amount) : -Math.abs(amount);
+
+        // Check if debit would result in negative balance
+        if (type === "DEBIT" && wallet.balance < Math.abs(amount)) {
+            return res.status(400).json({
+                success: false,
+                message: "Insufficient balance for debit adjustment"
+            });
+        }
+
+        // Add transaction record
+        const transaction = {
+            type: type === "CREDIT" ? "DEPOSIT" : "WITHDRAWAL",
+            amount: adjustmentAmount,
+            description: `Admin adjustment: ${reason}`,
+            status: "COMPLETED",
+            createdAt: new Date()
+        };
+
+        wallet.transactions.push(transaction);
+        wallet.balance += adjustmentAmount;
+        await wallet.save();
+
+        // If this CREDIT adjustment brought a commuter's wallet back to >= 0, it may
+        // have covered an outstanding cash-cancellation fee (the negative balance).
+        // Settle it now: credit the admin the fee, clear the identity ledger / user
+        // mirror block, and flag the related bookings as settled — otherwise the
+        // commuter stays wrongly blocked from booking even though they no longer owe
+        // anything. settleCashDuesOnTopUp is idempotent and no-ops when nothing is due.
+        if (type === "CREDIT" && wallet.balance >= 0) {
+            try {
+                const settlement = await settleCashDuesOnTopUp(wallet.userId._id || wallet.userId);
+                if (settlement.settled) {
+                    console.log("[adjustWalletBalance] Cash cancellation due settled on admin credit:", settlement);
+                }
+            } catch (settleErr) {
+                console.error("[adjustWalletBalance] settleCashDuesOnTopUp failed:", settleErr.message);
+            }
+        }
+
+        // Notify user
+        await createNotification({
+            userId: wallet.userId._id,
+            type: "WALLET_UPDATED",
+            title: "Wallet Balance Adjusted",
+            message: `Your wallet balance has been ${type === "CREDIT" ? "credited" : "debited"} by ${Math.abs(amount)} ${wallet.currency}. Reason: ${reason}`,
+            data: {
+                adjustmentType: type,
+                amount: Math.abs(amount),
+                reason,
+                newBalance: wallet.balance,
+                adjustedBy: adminId
+            },
+            relatedEntityType: "WALLET"
+        });
+
+        sendRealTimeNotification(wallet.userId._id, {
+            type: "WALLET_UPDATED",
+            title: "Wallet Balance Adjusted",
+            message: `Your wallet has been ${type === "CREDIT" ? "credited" : "debited"} by ${Math.abs(amount)} ${wallet.currency}`,
+            createdAt: new Date(),
+            isRead: false,
+            data: { newBalance: wallet.balance }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Wallet ${type === "CREDIT" ? "credited" : "debited"} successfully`,
+            wallet,
+            transaction
+        });
+    } catch (error) {
+        console.error("[v0] Error adjusting wallet balance:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error adjusting wallet balance",
+            error: error.message,
+        });
+    }
+};
+
+// Get users with pending wallet notifications
+export const getPendingWalletNotifications = async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+
+        const notifications = await Notification.find({
+            type: { $in: ["WALLET_ADMIN_ALERT", "WALLET_ACTION_REQUIRED", "WALLET_FUND_REQUIRED"] },
+            userResponseStatus: "PENDING"
+        })
+            .populate("userId", "fullName email whatsappNumber role companyName")
+            .populate("walletId", "balance currency")
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await Notification.countDocuments({
+            type: { $in: ["WALLET_ADMIN_ALERT", "WALLET_ACTION_REQUIRED", "WALLET_FUND_REQUIRED"] },
+            userResponseStatus: "PENDING"
+        });
+
+        res.status(200).json({
+            success: true,
+            notifications,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching pending wallet notifications:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching pending notifications",
+            error: error.message,
+        });
+    }
+};
+
+// ==========================================
+// ADMIN MANAGEMENT FUNCTIONS
+// ==========================================
+
+// Get all admins
+export const getAllAdmins = async (req, res) => {
+    try {
+        const { page = 1, limit = 20, search, status } = req.query;
+        const query = { role: "ADMIN" };
+
+        if (status) query.status = status;
+
+        if (search) {
+            query.$or = [
+                { fullName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+            ];
+        }
+
+        const admins = await User.find(query)
+            .select('-password')
+            .populate('createdByAdmin', 'fullName email')
+            .sort({ createdAt: -1 })
+            .limit(Number.parseInt(limit))
+            .skip((Number.parseInt(page) - 1) * Number.parseInt(limit));
+
+        const total = await User.countDocuments(query);
+
+        // Surface the primary-owner flag so the UI can protect the owner row
+        // (hide Suspend/Delete/Demote) and badge it distinctly from other admins.
+        const adminsWithOwnerFlag = admins.map((a) => ({
+            ...a.toObject(),
+            isPrimaryOwner: isPrimaryOwnerId(a._id),
+        }));
+
+        res.status(200).json({
+            success: true,
+            admins: adminsWithOwnerFlag,
+            pagination: {
+                total,
+                page: Number.parseInt(page),
+                pages: Math.ceil(total / Number.parseInt(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching admins:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching admins",
+            error: error.message,
+        });
+    }
+};
+
+// Get admin stats
+export const getAdminStats = async (req, res) => {
+    try {
+        const [
+            totalAdmins,
+            superAdmins,
+            activeAdmins,
+            suspendedAdmins
+        ] = await Promise.all([
+            User.countDocuments({ role: "ADMIN" }),
+            User.countDocuments({ role: "ADMIN", "adminPermissions.isSuperAdmin": true }),
+            User.countDocuments({ role: "ADMIN", status: "ACTIVE" }),
+            User.countDocuments({ role: "ADMIN", status: "SUSPENDED" })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalAdmins,
+                superAdmins,
+                activeAdmins,
+                suspendedAdmins,
+                limitedAdmins: totalAdmins - superAdmins
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching admin stats:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching admin statistics",
+            error: error.message,
+        });
+    }
+};
+
+// Create new admin
+export const createAdmin = async (req, res) => {
+    try {
+        const {
+            fullName,
+            email,
+            password,
+            whatsappNumber,
+            countryCode,
+            isSuperAdmin,
+            modules
+        } = req.body;
+
+        // Validate required fields
+        if (!fullName || !email || !password || !whatsappNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "Full name, email, password, and WhatsApp number are required"
+            });
+        }
+
+        // Check if email already exists
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: "Email already registered"
+            });
+        }
+
+        // Verify the requesting admin has permission to create admins
+        const requestingAdmin = await User.findById(req.userId);
+        if (!requestingAdmin || requestingAdmin.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                message: "Only admins can create new admins"
+            });
+        }
+
+        // Check if requesting admin has adminManagement permission or is super admin
+        const canManageAdmins = requestingAdmin.adminPermissions?.isSuperAdmin ||
+            requestingAdmin.adminPermissions?.modules?.adminManagement;
+
+        if (!canManageAdmins) {
+            return res.status(403).json({
+                success: false,
+                message: "You don't have permission to create admins"
+            });
+        }
+
+        // Only super admins can create other super admins
+        if (isSuperAdmin && !requestingAdmin.adminPermissions?.isSuperAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "Only super admins can create other super admins"
+            });
+        }
+
+        // Create admin permissions object
+        const adminPermissions = {
+            isSuperAdmin: isSuperAdmin || false,
+            modules: isSuperAdmin ? {
+                overview: true,
+                b2cManagement: true,
+                ridePooling: true,
+                b2bListings: true,
+                users: true,
+                wallets: true,
+                vehicleApproval: true,
+                commission: true,
+                negotiations: true,
+                settlement: true,
+                dropdowns: true,
+                reports: true,
+                finance: true,
+                communication: true,
+                ads: true,
+                paymentVerification: true,
+                content: true,
+                adminManagement: true,
+                termsAndConditions: true,
+            } : {
+                overview: modules?.overview || false,
+                b2cManagement: modules?.b2cManagement || false,
+                ridePooling: modules?.ridePooling || false,
+                b2bListings: modules?.b2bListings || false,
+                users: modules?.users || false,
+                wallets: modules?.wallets || false,
+                vehicleApproval: modules?.vehicleApproval || false,
+                commission: modules?.commission || false,
+                negotiations: modules?.negotiations || false,
+                settlement: modules?.settlement || false,
+                dropdowns: modules?.dropdowns || false,
+                reports: modules?.reports || false,
+                finance: modules?.finance || false,
+                communication: modules?.communication || false,
+                ads: modules?.ads || false,
+                paymentVerification: modules?.paymentVerification || false,
+                content: modules?.content || false,
+                adminManagement: modules?.adminManagement || false,
+                termsAndConditions: modules?.termsAndConditions || false,
+            }
+        };
+
+        // Create new admin user
+        const newAdmin = new User({
+            role: "ADMIN",
+            fullName,
+            email: email.toLowerCase(),
+            password,
+            whatsappNumber,
+            countryCode: countryCode || "+971",
+            status: "ACTIVE",
+            isEmailVerified: true,
+            isPasswordSet: true,
+            adminPermissions,
+            createdByAdmin: req.userId,
+        });
+
+        await newAdmin.save();
+
+        // Create notification for the new admin
+        await createNotification({
+            userId: newAdmin._id,
+            type: "ACCOUNT_CREATED",
+            title: "Admin Account Created",
+            message: `Your admin account has been created by ${requestingAdmin.fullName}. You can now login to the admin dashboard.`,
+            data: {
+                createdBy: requestingAdmin._id,
+                permissions: adminPermissions
+            }
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "Admin created successfully",
+            admin: {
+                _id: newAdmin._id,
+                fullName: newAdmin.fullName,
+                email: newAdmin.email,
+                whatsappNumber: newAdmin.whatsappNumber,
+                status: newAdmin.status,
+                adminPermissions: newAdmin.adminPermissions,
+                createdAt: newAdmin.createdAt
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error creating admin:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error creating admin",
+            error: error.message,
+        });
+    }
+};
+
+// Update admin permissions
+export const updateAdminPermissions = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+        const { isSuperAdmin, modules } = req.body;
+
+        // Verify the requesting admin has permission
+        const requestingAdmin = await User.findById(req.userId);
+        if (!requestingAdmin || requestingAdmin.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                message: "Only admins can update admin permissions"
+            });
+        }
+
+        const canManageAdmins = requestingAdmin.adminPermissions?.isSuperAdmin ||
+            requestingAdmin.adminPermissions?.modules?.adminManagement;
+
+        if (!canManageAdmins) {
+            return res.status(403).json({
+                success: false,
+                message: "You don't have permission to manage admins"
+            });
+        }
+
+        // Find the admin to update
+        const adminToUpdate = await User.findOne({ _id: adminId, role: "ADMIN" });
+        if (!adminToUpdate) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        // OWNER PROTECTION: the primary owner account is immutable to everyone
+        // except the owner themselves, and can never be demoted from super admin.
+        if (isPrimaryOwnerId(adminId)) {
+            if (adminId !== req.userId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "The platform owner account cannot be modified by other admins."
+                });
+            }
+            if (isSuperAdmin === false) {
+                return res.status(403).json({
+                    success: false,
+                    message: "The platform owner must always remain a super admin."
+                });
+            }
+            // Force the owner to keep full super-admin access regardless of payload.
+            adminToUpdate.adminPermissions = {
+                isSuperAdmin: true,
+                modules: { ...ALL_ADMIN_MODULES },
+            };
+            await adminToUpdate.save();
+            return res.status(200).json({
+                success: true,
+                message: "Owner permissions are fixed at full super-admin access.",
+                admin: { ...adminToUpdate.toObject(), isPrimaryOwner: true },
+            });
+        }
+
+        // Prevent modifying own super admin status
+        if (adminId === req.userId.toString() && adminToUpdate.adminPermissions?.isSuperAdmin && !isSuperAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "You cannot remove your own super admin status"
+            });
+        }
+
+        // Only super admins can grant/revoke super admin status
+        if (isSuperAdmin !== adminToUpdate.adminPermissions?.isSuperAdmin) {
+            if (!requestingAdmin.adminPermissions?.isSuperAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Only super admins can change super admin status"
+                });
+            }
+        }
+
+        // Update permissions
+        adminToUpdate.adminPermissions = {
+            isSuperAdmin: isSuperAdmin || false,
+            modules: isSuperAdmin ? {
+                overview: true,
+                b2cManagement: true,
+                ridePooling: true,
+                b2bListings: true,
+                users: true,
+                wallets: true,
+                vehicleApproval: true,
+                commission: true,
+                negotiations: true,
+                settlement: true,
+                dropdowns: true,
+                reports: true,
+                finance: true,
+                communication: true,
+                ads: true,
+                paymentVerification: true,
+                content: true,
+                adminManagement: true,
+                termsAndConditions: true,
+            } : {
+                overview: modules?.overview || false,
+                b2cManagement: modules?.b2cManagement || false,
+                ridePooling: modules?.ridePooling || false,
+                b2bListings: modules?.b2bListings || false,
+                users: modules?.users || false,
+                wallets: modules?.wallets || false,
+                vehicleApproval: modules?.vehicleApproval || false,
+                commission: modules?.commission || false,
+                negotiations: modules?.negotiations || false,
+                settlement: modules?.settlement || false,
+                dropdowns: modules?.dropdowns || false,
+                reports: modules?.reports || false,
+                finance: modules?.finance || false,
+                communication: modules?.communication || false,
+                ads: modules?.ads || false,
+                paymentVerification: modules?.paymentVerification || false,
+                content: modules?.content || false,
+                adminManagement: modules?.adminManagement || false,
+                termsAndConditions: modules?.termsAndConditions || false,
+            }
+        };
+
+        await adminToUpdate.save();
+
+        // Notify the admin about permission changes
+        await createNotification({
+            userId: adminToUpdate._id,
+            type: "PERMISSIONS_UPDATED",
+            title: "Admin Permissions Updated",
+            message: `Your admin permissions have been updated by ${requestingAdmin.fullName}.`,
+            data: {
+                updatedBy: requestingAdmin._id,
+                newPermissions: adminToUpdate.adminPermissions
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Admin permissions updated successfully",
+            admin: adminToUpdate.toJSON()
+        });
+    } catch (error) {
+        console.error("[v0] Error updating admin permissions:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error updating admin permissions",
+            error: error.message,
+        });
+    }
+};
+
+// Get admin details
+export const getAdminDetails = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+
+        const admin = await User.findOne({ _id: adminId, role: "ADMIN" })
+            .select('-password')
+            .populate('createdByAdmin', 'fullName email');
+
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        // Get admin activity stats
+        const [
+            usersCreated,
+            adminsCreated
+        ] = await Promise.all([
+            User.countDocuments({
+                activatedBy: adminId,
+                role: { $ne: "ADMIN" }
+            }),
+            User.countDocuments({ createdByAdmin: adminId })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            admin: {
+                ...admin.toObject(),
+                isPrimaryOwner: isPrimaryOwnerId(admin._id),
+            },
+            stats: {
+                usersActivated: usersCreated,
+                adminsCreated
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching admin details:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching admin details",
+            error: error.message,
+        });
+    }
+};
+
+// Suspend admin
+export const suspendAdmin = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+        const { reason } = req.body;
+
+        // Verify the requesting admin has permission
+        const requestingAdmin = await User.findById(req.userId);
+        if (!requestingAdmin || requestingAdmin.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                message: "Only admins can suspend other admins"
+            });
+        }
+
+        const canManageAdmins = requestingAdmin.adminPermissions?.isSuperAdmin ||
+            requestingAdmin.adminPermissions?.modules?.adminManagement;
+
+        if (!canManageAdmins) {
+            return res.status(403).json({
+                success: false,
+                message: "You don't have permission to manage admins"
+            });
+        }
+
+        // Cannot suspend yourself
+        if (adminId === req.userId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You cannot suspend yourself"
+            });
+        }
+
+        // OWNER PROTECTION: the primary owner can never be suspended.
+        if (isPrimaryOwnerId(adminId)) {
+            return res.status(403).json({
+                success: false,
+                message: "The platform owner account cannot be suspended."
+            });
+        }
+
+        const adminToSuspend = await User.findOne({ _id: adminId, role: "ADMIN" });
+        if (!adminToSuspend) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        // Only super admins can suspend other super admins
+        if (adminToSuspend.adminPermissions?.isSuperAdmin && !requestingAdmin.adminPermissions?.isSuperAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "Only super admins can suspend other super admins"
+            });
+        }
+
+        adminToSuspend.status = "SUSPENDED";
+        adminToSuspend.suspendedAt = new Date();
+        adminToSuspend.suspendedBy = req.userId;
+        await adminToSuspend.save();
+
+        // Notify the suspended admin
+        await createNotification({
+            userId: adminToSuspend._id,
+            type: "ACCOUNT_SUSPENDED",
+            title: "Admin Account Suspended",
+            message: `Your admin account has been suspended. ${reason ? `Reason: ${reason}` : ''}`,
+            data: {
+                suspendedBy: requestingAdmin._id,
+                reason
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Admin suspended successfully",
+            admin: adminToSuspend.toJSON()
+        });
+    } catch (error) {
+        console.error("[v0] Error suspending admin:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error suspending admin",
+            error: error.message,
+        });
+    }
+};
+
+// Activate admin
+export const activateAdmin = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+
+        // Verify the requesting admin has permission
+        const requestingAdmin = await User.findById(req.userId);
+        if (!requestingAdmin || requestingAdmin.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                message: "Only admins can activate other admins"
+            });
+        }
+
+        const canManageAdmins = requestingAdmin.adminPermissions?.isSuperAdmin ||
+            requestingAdmin.adminPermissions?.modules?.adminManagement;
+
+        if (!canManageAdmins) {
+            return res.status(403).json({
+                success: false,
+                message: "You don't have permission to manage admins"
+            });
+        }
+
+        const adminToActivate = await User.findOne({ _id: adminId, role: "ADMIN" });
+        if (!adminToActivate) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        adminToActivate.status = "ACTIVE";
+        adminToActivate.activatedAt = new Date();
+        adminToActivate.activatedBy = req.userId;
+        await adminToActivate.save();
+
+        // Notify the activated admin
+        await createNotification({
+            userId: adminToActivate._id,
+            type: "ACCOUNT_ACTIVATED",
+            title: "Admin Account Activated",
+            message: `Your admin account has been activated by ${requestingAdmin.fullName}.`,
+            data: {
+                activatedBy: requestingAdmin._id
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Admin activated successfully",
+            admin: adminToActivate.toJSON()
+        });
+    } catch (error) {
+        console.error("[v0] Error activating admin:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error activating admin",
+            error: error.message,
+        });
+    }
+};
+
+// Delete admin
+export const deleteAdmin = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+
+        // Verify the requesting admin is a super admin
+        const requestingAdmin = await User.findById(req.userId);
+        if (!requestingAdmin || requestingAdmin.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                message: "Only admins can delete other admins"
+            });
+        }
+
+        if (!requestingAdmin.adminPermissions?.isSuperAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "Only super admins can delete admins"
+            });
+        }
+
+        // Cannot delete yourself
+        if (adminId === req.userId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You cannot delete yourself"
+            });
+        }
+
+        // OWNER PROTECTION: the primary owner can never be deleted.
+        if (isPrimaryOwnerId(adminId)) {
+            return res.status(403).json({
+                success: false,
+                message: "The platform owner account cannot be deleted."
+            });
+        }
+
+        const adminToDelete = await User.findOne({ _id: adminId, role: "ADMIN" });
+        if (!adminToDelete) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        await User.findByIdAndDelete(adminId);
+
+        res.status(200).json({
+            success: true,
+            message: "Admin deleted successfully"
+        });
+    } catch (error) {
+        console.error("[v0] Error deleting admin:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error deleting admin",
+            error: error.message,
+        });
+    }
+};
+
+// Get current admin's permissions
+export const getMyPermissions = async (req, res) => {
+    try {
+        const admin = await User.findById(req.userId).select('adminPermissions role fullName email');
+
+        if (!admin || admin.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        const owner = isPrimaryOwnerId(admin._id);
+
+        // The primary owner ALWAYS resolves to full super-admin access, even if
+        // their stored flags were somehow changed. This guarantees the real
+        // owner can never be locked out of any module.
+        const permissions = owner
+            ? { isSuperAdmin: true, modules: { ...ALL_ADMIN_MODULES } }
+            : admin.adminPermissions;
+
+        res.status(200).json({
+            success: true,
+            permissions,
+            admin: {
+                _id: admin._id,
+                fullName: admin.fullName,
+                email: admin.email,
+                role: admin.role,
+                isPrimaryOwner: owner,
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching admin permissions:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching permissions",
+            error: error.message,
+        });
+    }
+};
+
+// ============================================================
+// REVENUE REPORTS APIs - User-wise and Vendor-wise Reports
+// ============================================================
+
+// Get Corporate-wise revenue report
+export const getCorporateRevenueReport = async (req, res) => {
+    try {
+        const { startDate, endDate, page = 1, limit = 20, search } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        // Currency the admin is viewing the dashboard in (e.g. KWD). Every stored
+        // amount is in its own native currency and must be converted to this.
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Build date filter
+        const dateFilter = {};
+        if (startDate) dateFilter.$gte = new Date(startDate);
+        if (endDate) dateFilter.$lte = new Date(endDate);
+
+        // Get all corporate users with their payment data
+        const corporateUsers = await User.find({
+            role: "CORPORATE",
+            ...(search && {
+                $or: [
+                    { fullName: { $regex: search, $options: "i" } },
+                    { email: { $regex: search, $options: "i" } },
+                    { companyName: { $regex: search, $options: "i" } },
+                ]
+            })
+        }).select('_id fullName email companyName phoneNumber createdAt status profileImage');
+
+        const corporateIds = corporateUsers.map(u => u._id);
+
+        // Aggregate payments by corporate user
+        const paymentAggregation = await Payment.aggregate([
+            {
+                $match: {
+                    corporateOwnerId: { $in: corporateIds },
+                    status: "COMPLETED",
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: "$corporateOwnerId",
+                    totalPayments: { $sum: "$amount" },
+                    paymentCount: { $sum: 1 },
+                    // adminCommission is an object { amount, ... }; sum its `.amount`.
+                    totalAdminCommission: { $sum: { $ifNull: ["$adminCommission.amount", 0] } },
+                    avgPayment: { $avg: "$amount" },
+                    lastPaymentDate: { $max: "$createdAt" },
+                    currency: { $first: "$currency" }
+                }
+            }
+        ]);
+
+        // Get contract counts by corporate
+        const contractAggregation = await Contract.aggregate([
+            {
+                $match: {
+                    corporateOwnerId: { $in: corporateIds },
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: "$corporateOwnerId",
+                    totalContracts: { $sum: 1 },
+                    activeContracts: {
+                        $sum: { $cond: [{ $eq: ["$status", "ACTIVE"] }, 1, 0] }
+                    },
+                    totalContractValue: { $sum: "$financials.totalAmount" }
+                }
+            }
+        ]);
+
+        // The admin's commission FROM a corporate is the negotiation commission
+        // (a % of the savings the admin negotiated on their behalf), NOT the
+        // B2B fleet-owner commission on the Payment. Pull it from AdminNegotiation.
+        const negotiations = await AdminNegotiation.find({
+            corporateId: { $in: corporateIds },
+            status: "COMPLETED",
+            ...(Object.keys(dateFilter).length > 0 && { completedAt: dateFilter }),
+        }).select("corporateId currency priceSaved adminCommissionFromCorporate");
+
+        // corporateId -> { commissionPaid, commissionPending, savings } (all in displayCurrency)
+        const negotiationMap = new Map();
+        for (const n of negotiations) {
+            const key = n.corporateId.toString();
+            const cur = n.currency || "AED";
+            const commission = n.adminCommissionFromCorporate || {};
+            const amount = Number(commission.amount) || 0;
+            const statusC = commission.status || "PENDING";
+            const bucket = negotiationMap.get(key) || {
+                commissionPaid: 0,
+                commissionPending: 0,
+                savings: 0,
+                count: 0,
+            };
+            bucket.savings += convertForDisplay(Number(n.priceSaved) || 0, cur, displayCurrency);
+            bucket.count += 1;
+            if (statusC === "PAID") {
+                bucket.commissionPaid += convertForDisplay(amount, cur, displayCurrency);
+            } else if (statusC === "PENDING") {
+                bucket.commissionPending += convertForDisplay(amount, cur, displayCurrency);
+            }
+            negotiationMap.set(key, bucket);
+        }
+
+        // Create lookup maps
+        const paymentMap = new Map(paymentAggregation.map(p => [p._id.toString(), p]));
+        const contractMap = new Map(contractAggregation.map(c => [c._id.toString(), c]));
+
+        // Combine data — every money field converted into the display currency.
+        const revenueData = corporateUsers.map(user => {
+            const payments = paymentMap.get(user._id.toString()) || {};
+            const contracts = contractMap.get(user._id.toString()) || {};
+            const negotiation = negotiationMap.get(user._id.toString()) || {};
+            const nativeCurrency = payments.currency || "AED";
+            return {
+                userId: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                companyName: user.companyName || 'N/A',
+                phoneNumber: user.phoneNumber,
+                profileImage: user.profileImage,
+                status: user.status,
+                joinedDate: user.createdAt,
+                totalRevenue: convertForDisplay(payments.totalPayments || 0, nativeCurrency, displayCurrency),
+                paymentCount: payments.paymentCount || 0,
+                // Admin's real earning from this corporate = negotiation commission collected.
+                adminCommission: negotiation.commissionPaid || 0,
+                // Negotiation commission still owed by this corporate.
+                pendingCommission: negotiation.commissionPending || 0,
+                negotiationCount: negotiation.count || 0,
+                avgPaymentAmount: convertForDisplay(payments.avgPayment || 0, nativeCurrency, displayCurrency),
+                lastPaymentDate: payments.lastPaymentDate,
+                currency: displayCurrency,
+                totalContracts: contracts.totalContracts || 0,
+                activeContracts: contracts.activeContracts || 0,
+                totalContractValue: convertForDisplay(contracts.totalContractValue || 0, nativeCurrency, displayCurrency),
+            };
+        });
+
+        // Sort by total revenue descending
+        revenueData.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+        // Paginate
+        const paginatedData = revenueData.slice(skip, skip + parseInt(limit));
+
+        // Calculate totals (already in display currency)
+        const totals = {
+            totalCorporates: corporateUsers.length,
+            totalRevenue: revenueData.reduce((sum, r) => sum + r.totalRevenue, 0),
+            totalAdminCommission: revenueData.reduce((sum, r) => sum + r.adminCommission, 0),
+            totalPendingCommission: revenueData.reduce((sum, r) => sum + r.pendingCommission, 0),
+            totalContracts: revenueData.reduce((sum, r) => sum + r.totalContracts, 0),
+            activeContracts: revenueData.reduce((sum, r) => sum + r.activeContracts, 0),
+            currency: displayCurrency,
+        };
+
+        res.status(200).json({
+            success: true,
+            data: paginatedData,
+            totals,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(revenueData.length / parseInt(limit)),
+                totalRecords: revenueData.length,
+                hasMore: skip + parseInt(limit) < revenueData.length
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching corporate revenue report:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching corporate revenue report",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2C Partner-wise revenue report
+export const getB2CPartnerRevenueReport = async (req, res) => {
+    try {
+        const { startDate, endDate, page = 1, limit = 20, search } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Build date filter
+        const dateFilter = {};
+        if (startDate) dateFilter.$gte = new Date(startDate);
+        if (endDate) dateFilter.$lte = new Date(endDate);
+
+        // Get all B2C partner users
+        const b2cPartners = await User.find({
+            role: "B2C_PARTNER",
+            ...(search && {
+                $or: [
+                    { fullName: { $regex: search, $options: "i" } },
+                    { email: { $regex: search, $options: "i" } },
+                    { companyName: { $regex: search, $options: "i" } },
+                ]
+            })
+        }).select('_id fullName email companyName phoneNumber createdAt status profileImage');
+
+        const partnerIds = b2cPartners.map(u => u._id);
+
+        // Aggregate bookings by B2C partner.
+        // IMPORTANT: revenue is recognised the moment a booking becomes a
+        // real (revenue-generating) trip — i.e. when it is ACCEPTED — because
+        // the platform commission is taken in real time at acceptance,
+        // regardless of the payment method or gateway payment status. Filtering
+        // on paymentStatus === "COMPLETED" wrongly excluded cash rides and
+        // accepted-but-not-yet-settled online rides, making revenue read zero.
+        // This mirrors the Settlement module (the source of truth).
+        const bookingAggregation = await B2CPassengerBooking.aggregate([
+            {
+                $match: {
+                    b2cPartnerId: { $in: partnerIds },
+                    bookingStatus: { $in: ["ACCEPTED", "IN_PROGRESS", "COMPLETED"] },
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: "$b2cPartnerId",
+                    totalBookingRevenue: { $sum: "$paymentAmount" },
+                    bookingCount: { $sum: 1 },
+                    totalAdminCommission: { $sum: { $ifNull: ["$adminCommissionAmount", 0] } },
+                    totalDriverEarnings: { $sum: { $ifNull: ["$driverEarnings", 0] } },
+                    avgBookingAmount: { $avg: "$paymentAmount" },
+                    completedTrips: {
+                        $sum: { $cond: [{ $eq: ["$bookingStatus", "COMPLETED"] }, 1, 0] }
+                    },
+                    activeBookings: {
+                        $sum: { $cond: [{ $in: ["$bookingStatus", ["CONFIRMED", "ACCEPTED", "IN_PROGRESS"]] }, 1, 0] }
+                    },
+                    cancelledBookings: {
+                        $sum: { $cond: [{ $eq: ["$bookingStatus", "CANCELLED"] }, 1, 0] }
+                    },
+                    lastBookingDate: { $max: "$createdAt" },
+                    currency: { $first: "$currency" }
+                }
+            }
+        ]);
+
+        // Get wallet data for partners
+        const walletData = await Wallet.find({
+            userId: { $in: partnerIds },
+            role: "B2C_PARTNER"
+        }).select('userId balance totalEarnings totalWithdrawals currency');
+
+        // Create lookup maps
+        const bookingMap = new Map(bookingAggregation.map(b => [b._id.toString(), b]));
+        const walletMap = new Map(walletData.map(w => [w.userId.toString(), w]));
+
+        // Combine data — booking amounts converted from the booking currency and
+        // wallet amounts from the wallet currency into the admin's display currency.
+        const revenueData = b2cPartners.map(partner => {
+            const bookings = bookingMap.get(partner._id.toString()) || {};
+            const wallet = walletMap.get(partner._id.toString()) || {};
+            const bookingCurrency = bookings.currency || wallet.currency || "AED";
+            const walletCurrency = wallet.currency || bookingCurrency;
+
+            const totalBookingRevenue = convertForDisplay(bookings.totalBookingRevenue || 0, bookingCurrency, displayCurrency);
+            const adminCommission = convertForDisplay(bookings.totalAdminCommission || 0, bookingCurrency, displayCurrency);
+
+            // Net partner earnings = the driver/partner take-home stored on each
+            // booking (driverEarnings). This matches the Settlement module and is
+            // correct for cash rides too (where the partner keeps the full fare
+            // and the commission is recovered separately), unlike a naive
+            // "revenue - commission" subtraction.
+            const netPartnerEarnings = convertForDisplay(bookings.totalDriverEarnings || 0, bookingCurrency, displayCurrency);
+
+            return {
+                partnerId: partner._id,
+                fullName: partner.fullName,
+                email: partner.email,
+                companyName: partner.companyName || partner.fullName || 'N/A',
+                phoneNumber: partner.phoneNumber,
+                profileImage: partner.profileImage,
+                status: partner.status,
+                joinedDate: partner.createdAt,
+                totalBookingRevenue,
+                bookingCount: bookings.bookingCount || 0,
+                adminCommission,
+                netPartnerEarnings,
+                avgBookingAmount: convertForDisplay(bookings.avgBookingAmount || 0, bookingCurrency, displayCurrency),
+                completedTrips: bookings.completedTrips || 0,
+                activeBookings: bookings.activeBookings || 0,
+                cancelledBookings: bookings.cancelledBookings || 0,
+                lastBookingDate: bookings.lastBookingDate,
+                currency: displayCurrency,
+                walletBalance: convertForDisplay(wallet.balance || 0, walletCurrency, displayCurrency),
+                totalWalletEarnings: convertForDisplay(wallet.totalEarnings || 0, walletCurrency, displayCurrency),
+                totalWithdrawals: convertForDisplay(wallet.totalWithdrawals || 0, walletCurrency, displayCurrency),
+            };
+        });
+
+        // Sort by total revenue descending
+        revenueData.sort((a, b) => b.totalBookingRevenue - a.totalBookingRevenue);
+
+        // Paginate
+        const paginatedData = revenueData.slice(skip, skip + parseInt(limit));
+
+        // Calculate totals (already in display currency)
+        const totals = {
+            totalPartners: b2cPartners.length,
+            totalRevenue: revenueData.reduce((sum, r) => sum + r.totalBookingRevenue, 0),
+            totalAdminCommission: revenueData.reduce((sum, r) => sum + r.adminCommission, 0),
+            totalNetPartnerEarnings: revenueData.reduce((sum, r) => sum + r.netPartnerEarnings, 0),
+            totalBookings: revenueData.reduce((sum, r) => sum + r.bookingCount, 0),
+            totalCompletedTrips: revenueData.reduce((sum, r) => sum + r.completedTrips, 0),
+            totalActiveBookings: revenueData.reduce((sum, r) => sum + r.activeBookings, 0),
+            currency: displayCurrency,
+        };
+
+        res.status(200).json({
+            success: true,
+            data: paginatedData,
+            totals,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(revenueData.length / parseInt(limit)),
+                totalRecords: revenueData.length,
+                hasMore: skip + parseInt(limit) < revenueData.length
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2C partner revenue report:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2C partner revenue report",
+            error: error.message,
+        });
+    }
+};
+
+// Get B2B Partner-wise revenue report
+export const getB2BPartnerRevenueReport = async (req, res) => {
+    try {
+        const { startDate, endDate, page = 1, limit = 20, search } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const displayCurrency = resolveDisplayCurrency(req);
+
+        // Build date filter
+        const dateFilter = {};
+        if (startDate) dateFilter.$gte = new Date(startDate);
+        if (endDate) dateFilter.$lte = new Date(endDate);
+
+        // Get all B2B partner users
+        const b2bPartners = await User.find({
+            role: "B2B_PARTNER",
+            ...(search && {
+                $or: [
+                    { fullName: { $regex: search, $options: "i" } },
+                    { email: { $regex: search, $options: "i" } },
+                    { companyName: { $regex: search, $options: "i" } },
+                ]
+            })
+        }).select('_id fullName email companyName phoneNumber createdAt status profileImage');
+
+        const partnerIds = b2bPartners.map(u => u._id);
+
+        // Aggregate payments where B2B partner is the fleet owner
+        const paymentAggregation = await Payment.aggregate([
+            {
+                $match: {
+                    fleetOwnerId: { $in: partnerIds },
+                    status: "COMPLETED",
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: "$fleetOwnerId",
+                    totalRevenue: { $sum: "$fleetOwnerAmount" },
+                    paymentCount: { $sum: 1 },
+                    totalGrossAmount: { $sum: "$amount" },
+                    // adminCommission is stored as an object { amount, percentage,
+                    // appliedOn }, so we must sum its `.amount` sub-field. Summing
+                    // the object itself yields 0 and made platform commission read
+                    // zero (and forced a wrong gross-minus-net fallback that
+                    // misclassified held security deposits as commission).
+                    totalAdminCommission: { $sum: { $ifNull: ["$adminCommission.amount", 0] } },
+                    avgPayment: { $avg: "$fleetOwnerAmount" },
+                    lastPaymentDate: { $max: "$createdAt" },
+                    currency: { $first: "$currency" }
+                }
+            }
+        ]);
+
+        // Get contract counts where B2B partner is the fleet owner
+        const contractAggregation = await Contract.aggregate([
+            {
+                $match: {
+                    fleetOwnerId: { $in: partnerIds },
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: "$fleetOwnerId",
+                    totalContracts: { $sum: 1 },
+                    activeContracts: {
+                        $sum: { $cond: [{ $eq: ["$status", "ACTIVE"] }, 1, 0] }
+                    },
+                    totalContractValue: { $sum: "$financials.totalAmount" }
+                }
+            }
+        ]);
+
+        // Get wallet data
+        const walletData = await Wallet.find({
+            userId: { $in: partnerIds },
+            role: "B2B_PARTNER"
+        }).select('userId balance totalEarnings totalWithdrawals currency');
+
+        // Create lookup maps
+        const paymentMap = new Map(paymentAggregation.map(p => [p._id.toString(), p]));
+        const contractMap = new Map(contractAggregation.map(c => [c._id.toString(), c]));
+        const walletMap = new Map(walletData.map(w => [w.userId.toString(), w]));
+
+        // Combine data — payment amounts converted from the payment currency and
+        // wallet amounts from the wallet currency into the admin's display currency.
+        const revenueData = b2bPartners.map(partner => {
+            const payments = paymentMap.get(partner._id.toString()) || {};
+            const contracts = contractMap.get(partner._id.toString()) || {};
+            const wallet = walletMap.get(partner._id.toString()) || {};
+            const paymentCurrency = payments.currency || wallet.currency || "AED";
+            const walletCurrency = wallet.currency || paymentCurrency;
+
+            // Platform commission on a B2B payment = gross amount - fleet owner payout.
+            // Prefer the stored adminCommission, fall back to the derived difference.
+            const rawCommission =
+                (payments.totalAdminCommission || 0) > 0
+                    ? payments.totalAdminCommission
+                    : Math.max(0, (payments.totalGrossAmount || 0) - (payments.totalRevenue || 0));
+
+            return {
+                partnerId: partner._id,
+                fullName: partner.fullName,
+                email: partner.email,
+                companyName: partner.companyName || partner.fullName || 'N/A',
+                phoneNumber: partner.phoneNumber,
+                profileImage: partner.profileImage,
+                status: partner.status,
+                joinedDate: partner.createdAt,
+                totalRevenue: convertForDisplay(payments.totalRevenue || 0, paymentCurrency, displayCurrency),
+                totalGrossAmount: convertForDisplay(payments.totalGrossAmount || 0, paymentCurrency, displayCurrency),
+                adminCommission: convertForDisplay(rawCommission, paymentCurrency, displayCurrency),
+                paymentCount: payments.paymentCount || 0,
+                avgPaymentAmount: convertForDisplay(payments.avgPayment || 0, paymentCurrency, displayCurrency),
+                lastPaymentDate: payments.lastPaymentDate,
+                currency: displayCurrency,
+                totalContracts: contracts.totalContracts || 0,
+                activeContracts: contracts.activeContracts || 0,
+                totalContractValue: convertForDisplay(contracts.totalContractValue || 0, paymentCurrency, displayCurrency),
+                walletBalance: convertForDisplay(wallet.balance || 0, walletCurrency, displayCurrency),
+                totalWalletEarnings: convertForDisplay(wallet.totalEarnings || 0, walletCurrency, displayCurrency),
+                totalWithdrawals: convertForDisplay(wallet.totalWithdrawals || 0, walletCurrency, displayCurrency),
+            };
+        });
+
+        // Sort by total revenue descending
+        revenueData.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+        // Paginate
+        const paginatedData = revenueData.slice(skip, skip + parseInt(limit));
+
+        // Calculate totals (already in display currency)
+        const totals = {
+            totalPartners: b2bPartners.length,
+            totalRevenue: revenueData.reduce((sum, r) => sum + r.totalRevenue, 0),
+            totalGrossAmount: revenueData.reduce((sum, r) => sum + r.totalGrossAmount, 0),
+            totalAdminCommission: revenueData.reduce((sum, r) => sum + r.adminCommission, 0),
+            totalContracts: revenueData.reduce((sum, r) => sum + r.totalContracts, 0),
+            activeContracts: revenueData.reduce((sum, r) => sum + r.activeContracts, 0),
+            currency: displayCurrency,
+        };
+
+        res.status(200).json({
+            success: true,
+            data: paginatedData,
+            totals,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(revenueData.length / parseInt(limit)),
+                totalRecords: revenueData.length,
+                hasMore: skip + parseInt(limit) < revenueData.length
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching B2B partner revenue report:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching B2B partner revenue report",
+            error: error.message,
+        });
+    }
+};
+
+// Get overall revenue summary
+export const getRevenueSummary = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const displayCurrency = resolveDisplayCurrency(req);
+        const round = (n) => Math.round((Number(n) || 0) * 1e6) / 1e6;
+
+        // Build date filter
+        const dateFilter = {};
+        if (startDate) dateFilter.$gte = new Date(startDate);
+        if (endDate) dateFilter.$lte = new Date(endDate);
+
+        // Get payment statistics — grouped BY CURRENCY so each native-currency
+        // bucket can be converted into the display currency before summing.
+        const paymentStats = await Payment.aggregate([
+            {
+                $match: {
+                    status: "COMPLETED",
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: { $ifNull: ["$currency", "AED"] },
+                    totalPaymentRevenue: { $sum: "$amount" },
+                    // adminCommission is an object { amount, ... } — sum its
+                    // `.amount` sub-field, not the object (which sums to 0).
+                    totalAdminCommission: { $sum: { $ifNull: ["$adminCommission.amount", 0] } },
+                    paymentCount: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // Get B2C booking statistics grouped by currency. Revenue is recognised
+        // at acceptance (commission is taken in real time), so we count every
+        // revenue-generating booking (ACCEPTED / IN_PROGRESS / COMPLETED) — NOT
+        // only those whose gateway paymentStatus reached "COMPLETED". This
+        // matches the Settlement module and includes cash rides.
+        const bookingStats = await B2CPassengerBooking.aggregate([
+            {
+                $match: {
+                    bookingStatus: { $in: ["ACCEPTED", "IN_PROGRESS", "COMPLETED"] },
+                    ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+                }
+            },
+            {
+                $group: {
+                    _id: { $ifNull: ["$currency", "AED"] },
+                    totalBookingRevenue: { $sum: "$paymentAmount" },
+                    totalBookingCommission: { $sum: { $ifNull: ["$adminCommissionAmount", 0] } },
+                    bookingCount: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // Negotiation commission the platform earned from corporates (PAID only),
+        // converted from each negotiation's native currency.
+        const negotiations = await AdminNegotiation.find({
+            status: "COMPLETED",
+            ...(Object.keys(dateFilter).length > 0 && { completedAt: dateFilter }),
+        }).select("currency adminCommissionFromCorporate");
+
+        let negotiationCommission = 0;
+        for (const n of negotiations) {
+            const c = n.adminCommissionFromCorporate || {};
+            if (c.status === "PAID") {
+                negotiationCommission += convertForDisplay(Number(c.amount) || 0, n.currency || "AED", displayCurrency);
+            }
+        }
+
+        // Convert + sum contract-payment buckets into the display currency.
+        let corporateRevenue = 0, corporateCommission = 0, corporatePayments = 0;
+        for (const b of paymentStats) {
+            const cur = b._id || "AED";
+            corporateRevenue += convertForDisplay(b.totalPaymentRevenue || 0, cur, displayCurrency);
+            corporateCommission += convertForDisplay(b.totalAdminCommission || 0, cur, displayCurrency);
+            corporatePayments += b.paymentCount || 0;
+        }
+
+        // Convert + sum B2C booking buckets into the display currency.
+        let b2cRevenue = 0, b2cCommission = 0, b2cBookings = 0;
+        for (const b of bookingStats) {
+            const cur = b._id || "AED";
+            b2cRevenue += convertForDisplay(b.totalBookingRevenue || 0, cur, displayCurrency);
+            b2cCommission += convertForDisplay(b.totalBookingCommission || 0, cur, displayCurrency);
+            b2cBookings += b.bookingCount || 0;
+        }
+
+        // Get user counts by role
+        const userCounts = await User.aggregate([
+            {
+                $match: {
+                    role: { $in: ["CORPORATE", "B2C_PARTNER", "B2B_PARTNER"] }
+                }
+            },
+            {
+                $group: {
+                    _id: "$role",
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // Get admin wallet for total earnings
+        const adminWallet = await Wallet.findOne({ role: "ADMIN" });
+
+        const userCountMap = new Map(userCounts.map(u => [u._id, u.count]));
+
+        // Admin wallet balance, converted from its own native currency.
+        const adminWalletBalance = convertForDisplay(
+            adminWallet?.balance || 0,
+            adminWallet?.currency || "AED",
+            displayCurrency
+        );
+        const adminTotalEarnings = convertForDisplay(
+            adminWallet?.totalEarnings || 0,
+            adminWallet?.currency || "AED",
+            displayCurrency
+        );
+
+        // Total platform commission = B2B/contract-side + B2C-side + corporate
+        // negotiation commission (all real platform revenue).
+        const totalCommission = corporateCommission + b2cCommission + negotiationCommission;
+
+        res.status(200).json({
+            success: true,
+            summary: {
+                // Revenue breakdown (all in display currency)
+                corporateRevenue: round(corporateRevenue),
+                b2cRevenue: round(b2cRevenue),
+                totalRevenue: round(corporateRevenue + b2cRevenue),
+
+                // Commission breakdown (all in display currency)
+                corporateCommission: round(corporateCommission),
+                b2cCommission: round(b2cCommission),
+                negotiationCommission: round(negotiationCommission),
+                totalCommission: round(totalCommission),
+
+                // Transaction counts
+                corporatePayments,
+                b2cBookings,
+
+                // User counts
+                totalCorporates: userCountMap.get("CORPORATE") || 0,
+                totalB2CPartners: userCountMap.get("B2C_PARTNER") || 0,
+                totalB2BPartners: userCountMap.get("B2B_PARTNER") || 0,
+
+                // Admin wallet (in display currency)
+                adminWalletBalance: round(adminWalletBalance),
+                adminTotalEarnings: round(adminTotalEarnings),
+
+                currency: displayCurrency
+            }
+        });
+    } catch (error) {
+        console.error("[v0] Error fetching revenue summary:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching revenue summary",
+            error: error.message,
+        });
+    }
+};

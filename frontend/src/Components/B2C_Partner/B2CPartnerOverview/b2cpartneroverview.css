@@ -1,0 +1,319 @@
+/* B2C Partner — Dashboard Overview (DriveMeGo brand) */
+.drivemego-b2c-overview {
+  font-family: var(--dmg-font);
+  color: var(--dmg-ink);
+}
+
+.drivemego-b2c-overview-loading,
+.drivemego-b2c-overview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 72px 20px;
+  gap: 16px;
+  color: var(--dmg-muted);
+  font-family: var(--dmg-font);
+}
+
+.drivemego-loading-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid var(--dmg-teal-050);
+  border-top-color: var(--dmg-teal);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.drivemego-retry-btn {
+  padding: 11px 24px;
+  background: var(--dmg-cta);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--dmg-cta-shadow);
+}
+
+.drivemego-overview-header {
+  margin-bottom: 26px;
+}
+
+.drivemego-overview-header h2 {
+  font-size: clamp(20px, 2.4vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--dmg-navy);
+  margin: 0 0 4px 0;
+}
+
+.drivemego-overview-header p {
+  color: var(--dmg-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ---- KPI cards ---- */
+.drivemego-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+.drivemego-stat-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  background: var(--dmg-card);
+  border-radius: var(--dmg-radius-md);
+  border: 1px solid var(--dmg-line);
+  box-shadow: var(--dmg-shadow-sm);
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.drivemego-stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--dmg-teal);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.drivemego-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--dmg-shadow);
+  border-color: var(--dmg-teal-100);
+}
+
+.drivemego-stat-card:hover::before {
+  opacity: 1;
+}
+
+.drivemego-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.drivemego-stat-routes .drivemego-stat-icon {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+}
+.drivemego-stat-subscribers .drivemego-stat-icon {
+  background: var(--dmg-green-050);
+  color: var(--dmg-green);
+}
+.drivemego-stat-revenue .drivemego-stat-icon {
+  background: var(--dmg-amber-050);
+  color: #c77d10;
+}
+.drivemego-stat-trips .drivemego-stat-icon {
+  background: rgba(10, 42, 67, 0.08);
+  color: var(--dmg-navy);
+}
+.drivemego-stat-requests .drivemego-stat-icon {
+  background: var(--dmg-red-050);
+  color: var(--dmg-red-600);
+}
+.drivemego-stat-renewals .drivemego-stat-icon {
+  background: var(--dmg-blue-050);
+  color: var(--dmg-blue);
+}
+
+.drivemego-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.drivemego-stat-label {
+  font-size: 13px;
+  color: var(--dmg-muted);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* ---- Route table ---- */
+.drivemego-route-subscribers-section {
+  margin-bottom: 32px;
+}
+
+.drivemego-route-subscribers-section h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+  margin: 0 0 16px 0;
+  letter-spacing: -0.01em;
+}
+
+.drivemego-route-table {
+  background: var(--dmg-card);
+  border-radius: var(--dmg-radius-md);
+  border: 1px solid var(--dmg-line);
+  box-shadow: var(--dmg-shadow-sm);
+  overflow: hidden;
+}
+
+.drivemego-table-header,
+.drivemego-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+  padding: 14px 22px;
+  gap: 12px;
+  align-items: center;
+}
+
+.drivemego-table-header {
+  background: var(--dmg-bg);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--dmg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--dmg-line);
+}
+
+.drivemego-table-row {
+  font-size: 14px;
+  color: var(--dmg-ink);
+  border-bottom: 1px solid var(--dmg-line-2);
+  transition: background 0.15s ease;
+}
+
+.drivemego-table-row:hover {
+  background: var(--dmg-teal-050);
+}
+
+.drivemego-table-row:last-child {
+  border-bottom: none;
+}
+
+.drivemego-route-name {
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+.drivemego-subscriber-count {
+  font-weight: 700;
+  color: var(--dmg-green);
+}
+
+.drivemego-utilization-bar {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  background: var(--dmg-line);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.drivemego-utilization-fill {
+  height: 100%;
+  background: var(--dmg-cta);
+  border-radius: 100px;
+  transition: width 0.4s ease;
+}
+
+.drivemego-utilization-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+}
+
+/* ---- Summary cards ---- */
+.drivemego-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.drivemego-summary-card {
+  padding: 22px;
+  background: var(--dmg-card);
+  border-radius: var(--dmg-radius-md);
+  border: 1px solid var(--dmg-line);
+  box-shadow: var(--dmg-shadow-sm);
+}
+
+.drivemego-summary-card h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dmg-muted);
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.drivemego-summary-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.drivemego-loading-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--dmg-teal-050);
+  border-top-color: var(--dmg-teal);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@media (max-width: 768px) {
+  .drivemego-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .drivemego-table-header,
+  .drivemego-table-row {
+    grid-template-columns: 1.5fr 1fr 1fr;
+    font-size: 12px;
+    padding: 12px 16px;
+  }
+  .drivemego-table-header span:nth-child(4),
+  .drivemego-table-header span:nth-child(5),
+  .drivemego-table-row span:nth-child(4),
+  .drivemego-table-row span:nth-child(5) {
+    display: none;
+  }
+  .drivemego-summary-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .drivemego-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

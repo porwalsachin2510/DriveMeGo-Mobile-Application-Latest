@@ -1,0 +1,394 @@
+/* Daily Trips - Compact Collapsible Design */
+.drivemego-dt-daily-trips-wrapper {
+  border-top: 1px solid var(--dmg-bg);
+  margin-top: 5px;
+}
+
+/* Toggle Header */
+.drivemego-dt-daily-trips-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, var(--dmg-bg) 0%, var(--dmg-bg) 100%);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.drivemego-dt-daily-trips-toggle:hover {
+  background: linear-gradient(135deg, var(--dmg-bg) 0%, var(--dmg-line) 100%);
+}
+
+.drivemego-dt-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drivemego-dt-toggle-left svg {
+  color: var(--dmg-navy);
+}
+
+.drivemego-dt-toggle-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dmg-ink);
+}
+
+.drivemego-dt-badge-live {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.drivemego-dt-badge-today {
+  background: linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 100%);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.drivemego-dt-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drivemego-dt-trips-count {
+  font-size: 11px;
+  color: var(--dmg-muted-2);
+  font-weight: 500;
+}
+
+.drivemego-dt-chevron-icon {
+  color: var(--dmg-muted-2);
+  transition: transform 0.3s ease;
+}
+
+.drivemego-dt-chevron-icon.drivemego-dt-expanded {
+  transform: rotate(180deg);
+}
+
+/* Expandable Content */
+.drivemego-dt-daily-trips-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background: #fafbfc;
+}
+
+.drivemego-dt-daily-trips-content.drivemego-dt-expanded {
+  max-height: 400px;
+}
+
+.drivemego-dt-trips-inner-content {
+  padding: 12px 20px 16px;
+}
+
+/* Filter Pills */
+.drivemego-dt-filter-pills {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.drivemego-dt-filter-pill {
+  padding: 4px 10px;
+  border: 1px solid var(--dmg-line);
+  background: white;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dmg-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drivemego-dt-filter-pill:hover {
+  border-color: var(--dmg-navy);
+  color: var(--dmg-navy);
+}
+
+.drivemego-dt-filter-pill.active {
+  background: linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.drivemego-dt-refresh-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--dmg-line);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.drivemego-dt-refresh-btn:hover {
+  background: var(--dmg-bg);
+}
+
+.drivemego-dt-refresh-btn svg {
+  color: var(--dmg-muted);
+}
+
+/* Compact Trip List */
+.drivemego-dt-compact-trips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.drivemego-dt-compact-trips-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.drivemego-dt-compact-trips-list::-webkit-scrollbar-track {
+  background: var(--dmg-bg);
+  border-radius: 4px;
+}
+
+.drivemego-dt-compact-trips-list::-webkit-scrollbar-thumb {
+  background: var(--dmg-line);
+  border-radius: 4px;
+}
+
+/* Compact Trip Item */
+.drivemego-dt-compact-trip-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--dmg-line);
+  transition: all 0.2s;
+}
+
+.drivemego-dt-compact-trip-item:hover {
+  border-color: var(--dmg-line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.drivemego-dt-compact-trip-item.drivemego-dt-today {
+  background: linear-gradient(135deg, var(--dmg-teal-050) 0%, #f0f9ff 100%);
+  border-color: #93c5fd;
+}
+
+/* Date Mini */
+.drivemego-dt-trip-date-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  padding: 4px 0;
+}
+
+.drivemego-dt-date-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+  line-height: 1;
+}
+
+.drivemego-dt-date-month {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--dmg-muted-2);
+  text-transform: uppercase;
+}
+
+/* Trip Info Mini */
+.drivemego-dt-trip-info-mini {
+  flex: 1;
+  min-width: 0;
+}
+
+.drivemego-dt-route-mini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dmg-ink);
+  margin-bottom: 2px;
+}
+
+.drivemego-dt-route-mini .drivemego-dt-from,
+.drivemego-dt-route-mini .drivemego-dt-to {
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drivemego-dt-route-mini svg {
+  color: var(--dmg-muted-2);
+  flex-shrink: 0;
+}
+
+.drivemego-dt-trip-time-mini {
+  font-size: 10px;
+  color: var(--dmg-muted-2);
+}
+
+/* Trip Status Mini */
+.drivemego-dt-trip-status-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.drivemego-dt-status-dot {
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.drivemego-dt-status-dot.status-scheduled {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.drivemego-dt-status-dot.drivemego-dt-status-inprogress {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+.drivemego-dt-status-dot.drivemego-dt-status-completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.drivemego-dt-status-dot.drivemego-dt-status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.drivemego-dt-status-dot.drivemego-dt-status-delayed {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+/* Mini Actions */
+.drivemego-dt-mini-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.drivemego-dt-mini-start-btn,
+.drivemego-dt-mini-complete-btn {
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drivemego-dt-mini-start-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.drivemego-dt-mini-start-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+}
+
+.drivemego-dt-mini-complete-btn {
+  background: linear-gradient(135deg, var(--dmg-teal) 0%, var(--dmg-teal-600) 100%);
+  color: white;
+}
+
+.drivemego-dt-mini-complete-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(18, 176, 196, 0.3);
+}
+
+.drivemego-dt-mini-start-btn:disabled,
+.drivemego-dt-mini-complete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* No Trips Message */
+.drivemego-dt-no-trips-msg {
+  padding: 16px;
+  text-align: center;
+  color: var(--dmg-muted-2);
+  font-size: 12px;
+  background: white;
+  border-radius: 10px;
+  border: 1px dashed var(--dmg-line);
+}
+
+/* More Trips Message */
+.drivemego-dt-more-trips-msg {
+  text-align: center;
+  padding: 8px;
+  font-size: 11px;
+  color: var(--dmg-navy);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.drivemego-dt-more-trips-msg:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .drivemego-dt-daily-trips-toggle {
+    padding: 10px 16px;
+  }
+
+  .drivemego-dt-trips-inner-content {
+    padding: 10px 16px 14px;
+  }
+
+  .drivemego-dt-compact-trip-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .drivemego-dt-route-mini .drivemego-dt-from,
+  .drivemego-dt-route-mini .drivemego-dt-to {
+    max-width: 60px;
+  }
+
+  .drivemego-dt-filter-pills {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+
+  .drivemego-dt-filter-pill {
+    flex-shrink: 0;
+  }
+}

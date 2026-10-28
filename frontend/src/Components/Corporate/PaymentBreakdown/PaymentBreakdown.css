@@ -1,0 +1,244 @@
+.payment-breakdown {
+  background: #ffffff;
+  border: 1px solid #e4ecf3;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 10px 30px rgba(10, 42, 67, 0.07);
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.breakdown-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #0a2a43;
+  margin: 0 0 20px 0;
+  padding-bottom: 12px;
+  border-bottom: 3px solid #12b0c4;
+}
+
+.breakdown-section {
+  margin-bottom: 16px;
+}
+
+.breakdown-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.breakdown-item.payment-with-note {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.breakdown-item.highlight {
+  background: #fef3c7;
+  padding: 16px 12px;
+  border-radius: 8px;
+  border: 2px solid #fbbf24;
+  border-bottom: none;
+}
+
+.breakdown-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.breakdown-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.breakdown-amount.total-due {
+  font-size: 18px;
+  color: #d97706;
+}
+
+.breakdown-amount.commission {
+  color: #ef4444;
+}
+
+.breakdown-amount.fleet-owner {
+  color: #0e97a8;
+}
+
+.breakdown-amount.negotiation-commission {
+  color: #0a2a43;
+  font-weight: 700;
+}
+
+.breakdown-amount.negotiation-paid {
+  color: #10b981;
+}
+
+.breakdown-item.negotiation-fee {
+  background: #e6f7fa;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #bfe9ef;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 8px 0;
+}
+
+.breakdown-item.negotiation-fee .breakdown-label {
+  color: #0a2a43;
+  font-weight: 700;
+}
+
+.breakdown-item.negotiation-fee.paid {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.breakdown-item.negotiation-fee.paid .breakdown-label {
+  color: #065f46;
+}
+
+.breakdown-divider.small {
+  margin: 8px 0;
+}
+
+.breakdown-note {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.breakdown-info {
+  background: #f6f9fc;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+  border-left: 4px solid #12b0c4;
+}
+
+.breakdown-info p {
+  font-size: 13px;
+  color: #374151;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.breakdown-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.1), transparent);
+  margin: 16px 0;
+}
+
+* EMI Breakdown Specific Styles */
+.payment-breakdown.emi-breakdown {
+  background: #f4fbfc;
+  border-color: #bfe9ef;
+}
+
+.payment-breakdown.emi-breakdown .breakdown-title {
+  border-bottom-color: #12b0c4;
+}
+
+.breakdown-item.highlight-admin {
+  background: #e6f7fa;
+  padding: 14px 12px;
+  border-radius: 10px;
+  border: 2px solid #12b0c4;
+  margin-top: 12px;
+}
+
+.breakdown-amount.total-admin {
+  color: #0a2a43;
+  font-size: 17px;
+}
+
+.summary-section {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.breakdown-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.summary-row.admin-row {
+  background: #e6f7fa;
+  border-color: #bfe9ef;
+}
+
+.summary-row.admin-row .summary-value {
+  color: #0a2a43;
+}
+
+.summary-row.fleet-row {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.summary-row.fleet-row .summary-value {
+  color: #059669;
+}
+
+.summary-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+@media (max-width: 640px) {
+  .payment-breakdown {
+    padding: 16px;
+    margin: 16px 0;
+  }
+
+  .breakdown-title {
+    font-size: 16px;
+  }
+
+  .breakdown-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .breakdown-amount {
+    margin-top: 4px;
+  }
+  .summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

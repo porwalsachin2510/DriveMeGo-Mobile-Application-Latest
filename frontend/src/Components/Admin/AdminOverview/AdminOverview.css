@@ -1,0 +1,472 @@
+/* =====================================================================
+   Admin Overview — DriveMeGo brand system
+   Deep navy (#0a2a43) + logo teal (#12b0c4), Plus Jakarta Sans.
+   Matches the redesigned Commuter / Login / Register experience.
+   ===================================================================== */
+.drivemego-aot-admin-overview {
+  --ov-navy: #0a2a43;
+  --ov-navy-600: #1c4d70;
+  --ov-teal: #12b0c4;
+  --ov-teal-600: #0e97a8;
+  --ov-teal-050: #e6f7fa;
+  --ov-ink: #0f2233;
+  --ov-muted: #5b6b7b;
+  --ov-line: #e4ecf3;
+  --ov-bg: #eef3f8;
+  padding: 28px;
+  background: var(--ov-bg);
+  min-height: 100vh;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ---------- Hero header ---------- */
+.overview-header {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+  padding: 28px 32px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(18, 176, 196, 0.28) 0%, rgba(18, 176, 196, 0) 55%),
+    linear-gradient(135deg, #0a2a43 0%, #123a58 60%, #0e2f49 100%);
+  color: #fff;
+  overflow: hidden;
+  box-shadow: 0 18px 40px rgba(10, 42, 67, 0.28);
+}
+
+.overview-header::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  bottom: -80px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(18, 176, 196, 0.35) 0%, rgba(18, 176, 196, 0) 70%);
+  pointer-events: none;
+}
+
+.overview-header-text {
+  position: relative;
+  z-index: 1;
+}
+
+.overview-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7fe3ef;
+  margin-bottom: 10px;
+}
+
+.overview-header h2 {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.overview-subtitle {
+  margin: 8px 0 0;
+  font-size: 14.5px;
+  color: rgba(226, 240, 248, 0.82);
+  max-width: 520px;
+}
+
+.last-updated {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2f0f8;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 9px 16px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+.last-updated-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.25);
+  animation: ov-pulse 2s infinite;
+}
+
+@keyframes ov-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ---------- Layout ---------- */
+.overview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.stats-section,
+.charts-section {
+  margin-bottom: 4px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.chart-container {
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 20px;
+  border: 1px solid var(--ov-line);
+  box-shadow: 0 2px 12px rgba(10, 42, 67, 0.05);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.chart-container:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(10, 42, 67, 0.1);
+}
+
+.chart-container.full-width {
+  grid-column: 1 / -1;
+}
+
+/* ---------- Activity + payment control ---------- */
+.activity-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pay-control-section {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 26px;
+  box-shadow: 0 2px 12px rgba(10, 42, 67, 0.05);
+  border: 1px solid var(--ov-line);
+}
+
+.pay-control-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ov-line);
+}
+
+.pay-control-header h3 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ov-navy);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pay-control-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--ov-teal-050);
+  color: var(--ov-teal-600);
+}
+
+.pay-control-title-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pay-control-status-badge {
+  padding: 7px 15px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pay-control-status-badge.enabled {
+  background: #e4f6ec;
+  color: #1a9e63;
+}
+
+.pay-control-status-badge.disabled {
+  background: #fdeaea;
+  color: #dc2626;
+}
+
+.pay-control-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 22px;
+  background: linear-gradient(135deg, #f5fafc 0%, #eef3f8 100%);
+  border-radius: 16px;
+  border: 1px solid var(--ov-line);
+}
+
+.pay-control-status-info {
+  flex: 1;
+  min-width: 220px;
+}
+
+.pay-control-status-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pay-control-status-text {
+  font-size: 16px;
+  color: var(--ov-ink);
+  font-weight: 500;
+}
+
+.pay-control-status-text strong {
+  color: var(--ov-navy);
+  font-weight: 800;
+}
+
+.pay-control-last-toggled-info {
+  color: var(--ov-muted);
+  font-size: 12.5px;
+  background: #ffffff;
+  border: 1px solid var(--ov-line);
+  padding: 7px 12px;
+  border-radius: 8px;
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.pay-control-actions {
+  flex-shrink: 0;
+}
+
+.pay-control-toggle-btn {
+  padding: 14px 30px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  min-width: 140px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  font-family: inherit;
+}
+
+.pay-control-toggle-btn.enable {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.28);
+}
+
+.pay-control-toggle-btn.disable {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.28);
+}
+
+.pay-control-toggle-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.pay-control-status-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.pay-control-status-dot.enabled {
+  background-color: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+}
+
+.pay-control-status-dot.disabled {
+  background-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
+}
+
+/* ---------- Recent activity ---------- */
+.activity-section > h3 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ov-navy);
+  margin: 4px 0 -6px;
+  letter-spacing: -0.01em;
+}
+
+.activity-list {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 12px 24px;
+  border: 1px solid var(--ov-line);
+  box-shadow: 0 2px 12px rgba(10, 42, 67, 0.05);
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ov-line);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ov-teal-050);
+  color: var(--ov-teal-600);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.activity-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ov-ink);
+  margin: 0 0 3px 0;
+}
+
+.activity-description {
+  font-size: 13px;
+  color: var(--ov-muted);
+  margin: 0 0 6px 0;
+}
+
+.activity-time {
+  font-size: 12px;
+  color: #8598a8;
+  font-weight: 600;
+}
+
+.no-activity {
+  text-align: center;
+  padding: 40px;
+  color: var(--ov-muted);
+}
+
+/* ---------- Loading / error ---------- */
+.drivemego-aot-loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid var(--ov-line);
+  box-shadow: 0 2px 12px rgba(10, 42, 67, 0.05);
+  color: var(--ov-muted);
+  font-weight: 600;
+}
+
+.drivemego-aot-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--ov-teal-050);
+  border-top: 4px solid var(--ov-teal);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.retry-btn {
+  padding: 11px 22px;
+  background: linear-gradient(135deg, var(--ov-teal) 0%, var(--ov-teal-600) 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 16px;
+  font-family: inherit;
+  box-shadow: 0 8px 18px rgba(18, 176, 196, 0.28);
+  transition: transform 0.2s ease;
+}
+
+.retry-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1200px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .drivemego-aot-admin-overview {
+    padding: 16px;
+  }
+
+  .overview-header {
+    padding: 22px;
+    flex-direction: column;
+  }
+
+  .overview-header h2 {
+    font-size: 24px;
+  }
+
+  .pay-control-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pay-control-actions,
+  .pay-control-toggle-btn {
+    width: 100%;
+  }
+}

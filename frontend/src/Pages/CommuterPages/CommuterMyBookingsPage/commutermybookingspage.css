@@ -1,0 +1,828 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================================
+   DriveMeGo — Commuter My Bookings (prefixed cmbp-)
+   Redesigned on the brand system: deep navy + logo teal, Plus Jakarta
+   Sans, soft cards and a floating gradient hero header. Matches the
+   CommuterHomePage / Login / Register visual language.
+   ===================================================================== */
+
+:root {
+  --dmg-navy: #0a2a43;
+  --dmg-navy-700: #123a58;
+  --dmg-navy-600: #1c4d70;
+  --dmg-teal: #12b0c4;
+  --dmg-teal-600: #0e97a8;
+  --dmg-teal-050: #e6f7fa;
+  --dmg-cta: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  --dmg-cta-hover: linear-gradient(135deg, #12b0c4 0%, #0c8695 100%);
+  --dmg-cta-shadow: 0 12px 26px rgba(18, 176, 196, 0.3);
+  --dmg-cta-shadow-lg: 0 16px 34px rgba(18, 176, 196, 0.38);
+  --dmg-amber: #f6a723;
+  --dmg-bg: #eef3f8;
+  --dmg-card: #ffffff;
+  --dmg-ink: #0f2233;
+  --dmg-muted: #5b6b7b;
+  --dmg-muted-2: #8598a8;
+  --dmg-line: #e4ecf3;
+  --dmg-shadow: 0 10px 30px rgba(10, 42, 67, 0.08);
+  --dmg-shadow-lg: 0 24px 60px rgba(10, 42, 67, 0.16);
+  --dmg-radius: 20px;
+  --dmg-radius-sm: 12px;
+  --dmg-font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --dmg-navy-gradient:
+    radial-gradient(600px 240px at 88% -30%, rgba(18, 176, 196, 0.34), transparent 60%),
+    linear-gradient(135deg, #0a2a43 0%, #123a58 60%, #0e3350 100%);
+}
+
+.cmbp-my-bookings-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--dmg-bg);
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  font-family: var(--dmg-font);
+}
+
+.cmbp-bookings-container {
+  flex: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 32px 24px 64px;
+  box-sizing: border-box;
+}
+
+/* ============ HERO HEADER ============ */
+.cmbp-bookings-header {
+  position: relative;
+  margin-bottom: 28px;
+  padding: 34px 32px;
+  border-radius: 26px;
+  overflow: hidden;
+  background: var(--dmg-navy-gradient);
+  isolation: isolate;
+}
+
+.cmbp-bookings-header::after {
+  content: "";
+  position: absolute;
+  right: -90px;
+  top: -120px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(18, 176, 196, 0.35);
+  z-index: -1;
+}
+
+.cmbp-bookings-header h1 {
+  font-size: clamp(24px, 3.4vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px 0;
+  color: #ffffff;
+}
+
+.cmbp-bookings-header p {
+  font-size: 14.5px;
+  color: rgba(226, 238, 246, 0.82);
+  margin: 0;
+  max-width: 620px;
+  line-height: 1.6;
+}
+
+/* Filter Buttons */
+.cmbp-filter-section {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.cmbp-filter-btn {
+  padding: 9px 20px;
+  border: 1px solid var(--dmg-line);
+  background-color: var(--dmg-card);
+  border-radius: 100px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dmg-muted);
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.cmbp-filter-btn:hover {
+  border-color: var(--dmg-teal);
+  color: var(--dmg-teal-600);
+  transform: translateY(-1px);
+}
+
+.cmbp-filter-btn.cmbp-active {
+  background: var(--dmg-cta);
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--dmg-cta-shadow);
+}
+
+/* Loading / Empty States */
+.cmbp-loading-state,
+.cmbp-empty-state {
+  text-align: center;
+  padding: 56px 20px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: var(--dmg-radius);
+  box-shadow: var(--dmg-shadow);
+}
+
+.cmbp-loading-state p,
+.cmbp-empty-state p {
+  font-size: 15px;
+  color: var(--dmg-muted);
+  margin: 0;
+  font-weight: 600;
+}
+
+.cmbp-empty-subtitle {
+  font-size: 13px;
+  color: var(--dmg-muted-2);
+  margin-top: 6px;
+}
+
+/* Bookings Grid - Responsive */
+.cmbp-bookings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: start;
+}
+
+/* ============ BOOKING CARD ============ */
+.cmbp-booking-card {
+  background: var(--dmg-card);
+  border-radius: var(--dmg-radius);
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(10, 42, 67, 0.05);
+  border: 1px solid var(--dmg-line);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  align-self: start;
+}
+
+.cmbp-booking-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(18, 176, 196, 0.4);
+  box-shadow: var(--dmg-shadow-lg);
+}
+
+/* Card Header with Gradient */
+.cmbp-card-header {
+  background: var(--dmg-navy-gradient);
+  padding: 18px 20px;
+  position: relative;
+}
+
+.cmbp-card-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cmbp-route-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cmbp-route-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  letter-spacing: -0.01em;
+}
+
+.cmbp-route-from,
+.cmbp-route-to {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmbp-route-arrow {
+  color: var(--dmg-teal);
+  flex-shrink: 0;
+}
+
+.cmbp-booking-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #eaf6f8;
+  backdrop-filter: blur(4px);
+}
+
+.cmbp-status-chip {
+  padding: 6px 12px;
+  border-radius: 100px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cmbp-status-chip.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.cmbp-status-chip.confirmed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.cmbp-status-chip.in-progress {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+}
+
+.cmbp-status-chip.completed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.cmbp-status-chip.cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Card Body */
+.cmbp-card-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Quick Info Row */
+.cmbp-quick-info {
+  display: flex;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--dmg-line);
+}
+
+.cmbp-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cmbp-info-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cmbp-info-icon.driver {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-600);
+}
+
+.cmbp-info-icon.vehicle {
+  background: rgba(10, 42, 67, 0.08);
+  color: var(--dmg-navy);
+}
+
+.cmbp-info-icon.payment {
+  background: rgba(246, 167, 35, 0.14);
+  color: #b8770a;
+}
+
+.cmbp-info-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cmbp-info-label {
+  font-size: 10px;
+  color: var(--dmg-muted-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.cmbp-info-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dmg-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmbp-info-value.online {
+  color: #10b981;
+}
+
+.cmbp-info-value.offline {
+  color: var(--dmg-muted-2);
+}
+
+/* Compact Details Row */
+.cmbp-compact-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f6f9fc;
+  border: 1px solid var(--dmg-line);
+  border-radius: var(--dmg-radius-sm);
+  gap: 12px;
+}
+
+.cmbp-detail-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--dmg-muted);
+}
+
+.cmbp-detail-chip svg {
+  width: 14px;
+  height: 14px;
+  color: var(--dmg-teal-600);
+}
+
+.cmbp-detail-chip strong {
+  color: var(--dmg-navy);
+  font-weight: 700;
+}
+
+.cmbp-amount-display {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  letter-spacing: -0.01em;
+}
+
+.cmbp-amount-currency {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dmg-muted);
+  margin-left: 2px;
+}
+
+/* Card Actions */
+.cmbp-card-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--dmg-line);
+  margin-top: 5px;
+}
+
+.cmbp-action-btn {
+  flex: 1;
+  padding: 11px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+}
+
+.cmbp-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.cmbp-action-btn.primary {
+  background: var(--dmg-cta);
+  color: white;
+  box-shadow: var(--dmg-cta-shadow);
+}
+
+.cmbp-action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dmg-cta-shadow-lg);
+}
+
+.cmbp-action-btn.secondary {
+  background: #eef3f8;
+  color: var(--dmg-navy);
+  border: 1px solid var(--dmg-line);
+}
+
+.cmbp-action-btn.secondary:hover {
+  background: #e3eaf2;
+  border-color: var(--dmg-teal);
+  color: var(--dmg-teal-600);
+}
+
+.cmbp-action-btn.track {
+  background: var(--dmg-cta);
+  color: white;
+  box-shadow: var(--dmg-cta-shadow);
+}
+
+.cmbp-action-btn.track:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dmg-cta-shadow-lg);
+}
+
+.cmbp-action-btn.download {
+  background: linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-600) 100%);
+  color: white;
+}
+
+.cmbp-action-btn.download:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(10, 42, 67, 0.3);
+}
+
+/* Trips Toggle */
+.cmbp-trips-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #f6f9fc;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-top: 1px solid var(--dmg-line);
+}
+
+.cmbp-trips-toggle:hover {
+  background: #eef3f8;
+}
+
+.cmbp-trips-toggle-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+}
+
+.cmbp-trips-toggle-text svg {
+  color: var(--dmg-teal-600);
+}
+
+.cmbp-trips-badge {
+  background: var(--dmg-cta);
+  color: white;
+  padding: 2px 9px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cmbp-trips-chevron {
+  color: var(--dmg-muted-2);
+  transition: transform 0.3s ease;
+}
+
+.cmbp-trips-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+/* Trips Section (Collapsible) */
+.cmbp-trips-section {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background: #f6f9fc;
+}
+
+.cmbp-trips-section.expanded {
+  max-height: 500px;
+}
+
+.cmbp-trips-content {
+  padding: 0 20px 16px;
+}
+
+/* ============ TRACKING MODAL ============ */
+.cmbp-tracking-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 42, 67, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.cmbp-tracking-modal {
+  background: white;
+  border-radius: var(--dmg-radius);
+  box-shadow: var(--dmg-shadow-lg);
+  max-width: 600px;
+  width: 92vw;
+  max-height: 90vh;
+  overflow: auto;
+  font-family: var(--dmg-font);
+}
+
+.cmbp-tracking-header {
+  background: var(--dmg-navy-gradient);
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: var(--dmg-radius) var(--dmg-radius) 0 0;
+}
+
+.cmbp-tracking-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cmbp-tracking-header button {
+  background: rgba(255, 255, 255, 0.16);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.cmbp-tracking-header button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.cmbp-tracking-info {
+  padding: 16px 24px;
+  background: #f6f9fc;
+  border-bottom: 1px solid var(--dmg-line);
+}
+
+.cmbp-tracking-info p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: var(--dmg-muted);
+}
+
+.cmbp-tracking-info strong {
+  color: var(--dmg-navy);
+}
+
+.cmbp-map-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.cmbp-map-container iframe {
+  width: 100%;
+  border: none;
+}
+
+.cmbp-tracking-actions {
+  padding: 16px 24px;
+  background: #f6f9fc;
+  border-radius: 0 0 var(--dmg-radius) var(--dmg-radius);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cmbp-tracking-actions button {
+  background: var(--dmg-cta);
+  color: white;
+  border: none;
+  padding: 11px 22px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  box-shadow: var(--dmg-cta-shadow);
+}
+
+.cmbp-tracking-actions button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dmg-cta-shadow-lg);
+}
+
+/* No-Show Modal */
+.cmbp-noshow-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 42, 67, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.cmbp-noshow-modal {
+  background: white;
+  border-radius: var(--dmg-radius);
+  box-shadow: var(--dmg-shadow-lg);
+  max-width: 500px;
+  width: 92vw;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+  font-family: var(--dmg-font);
+}
+
+.cmbp-noshow-modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dmg-navy);
+  letter-spacing: -0.01em;
+}
+
+.cmbp-noshow-modal select,
+.cmbp-noshow-modal textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--dmg-line);
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cmbp-noshow-modal select:focus,
+.cmbp-noshow-modal textarea:focus {
+  outline: none;
+  border-color: var(--dmg-teal);
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.14);
+}
+
+.cmbp-noshow-modal .cmbp-noshow-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Driver Status Badge */
+.cmbp-driver-status-badge {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--dmg-cta);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: var(--dmg-cta-shadow);
+  z-index: 10;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 992px) {
+  .cmbp-bookings-container {
+    max-width: 100%;
+    padding: 24px 20px 48px;
+  }
+
+  .cmbp-bookings-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cmbp-bookings-container {
+    padding: 16px 14px 40px;
+  }
+
+  .cmbp-bookings-header {
+    padding: 26px 22px;
+    border-radius: 22px;
+  }
+
+  .cmbp-bookings-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .cmbp-quick-info {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cmbp-info-item {
+    width: 100%;
+  }
+
+  .cmbp-compact-details {
+    flex-wrap: wrap;
+  }
+
+  .cmbp-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .cmbp-action-btn {
+    min-width: calc(50% - 4px);
+  }
+
+  .cmbp-tracking-modal {
+    max-width: 96vw;
+    width: 96vw;
+  }
+
+  .cmbp-filter-section {
+    gap: 6px;
+  }
+
+  .cmbp-filter-btn {
+    padding: 7px 15px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cmbp-bookings-container {
+    padding: 12px 10px 32px;
+  }
+
+  .cmbp-card-header {
+    padding: 14px 16px;
+  }
+
+  .cmbp-card-body {
+    padding: 14px 16px;
+  }
+
+  .cmbp-route-display {
+    font-size: 14px;
+  }
+
+  .cmbp-filter-section {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 8px;
+  }
+
+  .cmbp-filter-btn {
+    flex-shrink: 0;
+  }
+}

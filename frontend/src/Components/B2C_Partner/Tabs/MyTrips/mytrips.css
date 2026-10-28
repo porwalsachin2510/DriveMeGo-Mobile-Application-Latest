@@ -1,0 +1,80 @@
+/* B2C Partner — My Trips (DriveMeGo brand) */
+.my-trips {
+  width: 100%;
+  font-family: var(--dmg-font);
+  color: var(--dmg-ink);
+}
+
+.trips-sub-tabs {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  padding: 6px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: 14px;
+  box-shadow: var(--dmg-shadow-sm);
+}
+
+.sub-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--dmg-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: var(--dmg-font);
+}
+
+.sub-tab-btn:hover {
+  color: var(--dmg-navy);
+  background: var(--dmg-teal-050);
+}
+
+.sub-tab-btn.active {
+  background: var(--dmg-cta);
+  color: #ffffff;
+  box-shadow: var(--dmg-cta-shadow);
+}
+
+.sub-tab-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.trips-content {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .trips-sub-tabs {
+    gap: 4px;
+  }
+
+  .sub-tab-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .trips-sub-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .sub-tab-btn {
+    padding: 8px 12px;
+    font-size: 11px;
+    flex: 1;
+    min-width: 100px;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,957 @@
+/* Premium B2B Contract Details - Inter Font */
+.b2b-contract-details-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: var(--dmg-font);
+}
+
+.b2b-contract-back-btn {
+  background: white;
+  border: 2px solid #e5e7eb;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 24px;
+  color: #374151;
+}
+
+.b2b-contract-back-btn:hover {
+  border-color: #0a2a43;
+  color: #0a2a43;
+}
+
+.b2b-contract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.b2b-contract-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.b2b-contract-header p {
+  color: #6b7280;
+  font-size: 16px;
+  margin: 0;
+}
+
+.b2b-contract-status-badge {
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-document-uploaded {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+.status-corporate-signed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.b2b-contract-section {
+  margin-bottom: 32px;
+}
+
+.b2b-contract-section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+.b2b-contract-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.b2b-contract-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.b2b-contract-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.b2b-contract-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.b2b-contract-value {
+  font-size: 16px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.b2b-contract-value.b2b-contract-amount {
+  color: #059669;
+  font-size: 20px;
+}
+
+/* Added vehicle card styles */
+.b2b-contract-vehicle-card {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.b2b-contract-vehicle-image {
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.b2b-contract-vehicle-info {
+  flex: 1;
+}
+
+.b2b-contract-vehicle-info h3 {
+  font-size: 20px;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.b2b-contract-vehicle-category {
+  color: #0a2a43;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 4px 0;
+  text-transform: capitalize;
+}
+
+.b2b-contract-vehicle-reg {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0 0 12px 0;
+}
+
+.b2b-contract-vehicle-quantity {
+  display: inline-block;
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-right: 8px;
+}
+
+.b2b-contract-assigned-vehicles {
+  display: inline-block;
+  background: #d1fae5;
+  color: #065f46;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Added signature status styles */
+.b2b-contract-signature-status {
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+.b2b-contract-signature-status.signed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.b2b-contract-signature-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.b2b-contract-signature-date {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: normal;
+  display: block;
+  margin-top: 4px;
+}
+
+.b2b-contract-upload-card {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.b2b-contract-upload-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.b2b-contract-upload-card h3 {
+  font-size: 24px;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.b2b-contract-upload-card p {
+  color: #6b7280;
+  font-size: 16px;
+  margin: 0 0 24px 0;
+}
+
+.b2b-contract-select-file-btn {
+  display: inline-block;
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.b2b-contract-select-file-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(10, 42, 67, 0.4);
+}
+
+.b2b-contract-file-selected {
+  background: #f9fafb;
+  border: 2px dashed #0a2a43;
+  border-radius: 8px;
+  padding: 24px;
+  margin-top: 16px;
+}
+
+.b2b-contract-file-selected p {
+  margin: 0 0 16px 0;
+  color: #111827;
+}
+
+.b2b-contract-upload-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.b2b-contract-change-file-btn {
+  padding: 10px 24px;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.b2b-contract-change-file-btn:hover {
+  background: #e5e7eb;
+}
+
+.b2b-contract-upload-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.b2b-contract-upload-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.b2b-contract-upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.b2b-contract-document-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.b2b-contract-document-icon {
+  font-size: 48px;
+}
+
+.b2b-contract-document-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #111827;
+}
+
+.b2b-contract-document-info p {
+  margin: 0 0 12px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.b2b-contract-view-document-btn {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #0a2a43;
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.b2b-contract-view-document-btn:hover {
+  background: #123a58;
+}
+
+.b2b-contract-approval-card {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: white;
+}
+
+.b2b-contract-approval-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.b2b-contract-approval-card h3 {
+  font-size: 24px;
+  margin: 0 0 12px 0;
+}
+
+.b2b-contract-approval-card p {
+  font-size: 16px;
+  margin: 0 0 24px 0;
+  opacity: 0.95;
+}
+
+.b2b-contract-signature-info {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.doc-b2b-contract-signature-info{
+   background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.b2b-contract-signature-info p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.b2b-contract-approve-btn {
+  padding: 14px 32px;
+  background: white;
+  color: #0a2a43;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.b2b-contract-approve-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.b2b-contract-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.b2b-contract-modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+}
+
+.b2b-contract-modal-content h2 {
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  color: #111827;
+}
+
+.b2b-contract-modal-content p {
+  margin: 0 0 24px 0;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.b2b-contract-form-group {
+  margin-bottom: 24px;
+}
+
+.b2b-contract-form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+}
+
+.b2b-contract-form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.b2b-contract-form-group textarea:focus {
+  outline: none;
+  border-color: #0a2a43;
+}
+
+.b2b-contract-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.b2b-contract-btn-secondary,
+.b2b-contract-btn-primary {
+  flex: 1;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.b2b-contract-btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.b2b-contract-btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.b2b-contract-btn-primary {
+  background: linear-gradient(135deg, #0a2a43 0%, #123a58 100%);
+  color: white;
+}
+
+.b2b-contract-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(10, 42, 67, 0.4);
+}
+
+/* Added status style for pending fleet signature */
+.status-pending-fleet-signature {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+/* Added sign card styles for fleet owner signing section */
+.b2b-contract-sign-card {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: white;
+}
+
+.b2b-contract-sign-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.b2b-contract-sign-card h3 {
+  font-size: 24px;
+  margin: 0 0 12px 0;
+}
+
+.b2b-contract-sign-card p {
+  font-size: 16px;
+  margin: 0 0 24px 0;
+  opacity: 0.95;
+}
+
+.b2b-contract-sign-btn {
+  padding: 14px 32px;
+  background: white;
+  color: #10b981;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.b2b-contract-sign-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Added signature notice styles for legal disclaimer */
+.b2b-contract-signature-notice {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.b2b-contract-signature-notice p {
+  margin: 0 0 8px 0;
+  color: #92400e;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.b2b-contract-signature-notice ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  color: #92400e;
+}
+
+.b2b-contract-signature-notice li {
+  margin-bottom: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Added signature input styles */
+.b2b-contract-signature-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: "Brush Script MT", cursive, sans-serif;
+  transition: border-color 0.2s;
+}
+
+.b2b-contract-signature-input:focus {
+  outline: none;
+  border-color: #0a2a43;
+  box-shadow: 0 0 0 3px rgba(10, 42, 67, 0.1);
+}
+
+.b2b-contract-form-group small {
+  display: block;
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* Added signature preview styles */
+.b2b-contract-signature-preview {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.b2b-contract-signature-preview p {
+  margin: 0 0 12px 0;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.b2b-contract-signature-display {
+  padding: 16px 24px;
+  background: white;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  font-family: "Brush Script MT", cursive, sans-serif;
+  font-size: 24px;
+  color: #111827;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Added document preview styles for sign section */
+.b2b-contract-document-preview {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.b2b-contract-document-preview p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.b2b-contract-view-btn {
+  padding: 10px 20px;
+  background: white;
+  color: #0a2a43;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.b2b-contract-view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.b2b-contract-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.b2b-contract-btn-primary:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.b2b-contract-error,
+.b2b-contract-loading {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Due Date Extension Request Styles */
+.b2b-extension-request-info {
+  padding: 8px;
+}
+
+.b2b-extension-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.b2b-extension-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.b2b-extension-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.b2b-extension-badge.approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.b2b-extension-badge.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.b2b-extension-date {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.b2b-extension-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Signed Document Verification Section */
+.b2b-verification-section {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #10b981;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.b2b-contract-verification-card {
+  text-align: center;
+}
+
+.b2b-contract-verification-card h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 8px 0;
+}
+
+.b2b-contract-verification-card p {
+  color: #6b7280;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Document Comparison */
+.b2b-document-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.b2b-document-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.b2b-document-card:hover {
+  border-color: #0a2a43;
+  box-shadow: 0 4px 12px rgba(10, 42, 67, 0.1);
+}
+
+.b2b-document-card.signed-document {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.b2b-document-card h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.doc-upload-info {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 16px 0;
+}
+
+.doc-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.b2b-contract-download-btn {
+  background: white;
+  color: #0a2a43;
+  border: 2px solid #0a2a43;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.b2b-contract-download-btn:hover {
+  background: #0a2a43;
+  color: white;
+}
+
+.b2b-contract-view-btn.signed {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.b2b-contract-view-btn.signed:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+/* B2B Reject Button */
+.b2b-contract-reject-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.b2b-contract-reject-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+/* Corporate Signature Info */
+.b2b-corporate-signature-info {
+  background: var(--dmg-teal-050);
+  padding: 12px 20px;
+  border-radius: 8px;
+  border-left: 4px solid #0a2a43;
+}
+
+.b2b-corporate-signature-info p {
+  margin: 0;
+  color: var(--dmg-teal-700);
+  font-size: 14px;
+  text-align: left;
+}
+
+/* Status badges for new statuses */
+.status-pending-corporate-signature {
+  background: var(--dmg-teal-050);
+  color: var(--dmg-teal-700);
+}
+
+.status-pending-b2b-verification {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pending-fleet-signature {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-pending-payment {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+@media (max-width: 768px) {
+  .b2b-contract-details-container {
+  padding: 16px;
+  }
+
+  .b2b-document-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-actions {
+    flex-direction: column;
+  }
+
+  .doc-actions button {
+    width: 100%;
+  }
+
+  .b2b-extension-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .b2b-extension-actions {
+    flex-direction: column;
+  }
+  
+  .b2b-extension-actions button {
+    width: 100%;
+  }
+
+  .b2b-contract-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .b2b-contract-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .b2b-contract-upload-card {
+    padding: 24px;
+  }
+
+  .b2b-contract-upload-actions {
+    flex-direction: column;
+  }
+
+  .b2b-contract-vehicle-card {
+    flex-direction: column;
+  }
+
+  .b2b-contract-vehicle-image {
+    width: 100%;
+    max-width: 300px;
+  }
+}

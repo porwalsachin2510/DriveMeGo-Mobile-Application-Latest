@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "Drive Me Go",
+    "slug": "drivemego",
+    "scheme": "drivemego",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "backgroundColor": "#F4FAFC",
+    "ios": {
+      "bundleIdentifier": "com.drivemego.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Drive Me Go uses your location to share live trip progress with your passengers.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Drive Me Go uses your location during an active trip so passengers can track the ride.",
+        "NSCameraUsageDescription": "Allow camera access to take a profile photo.",
+        "NSPhotoLibraryUsageDescription": "Allow photo access to choose a profile photo."
+      }
+    },
+    "android": {
+      "package": "com.drivemego.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#F4FAFC"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo-mark.png",
+          "imageWidth": 140,
+          "resizeMode": "contain",
+          "backgroundColor": "#F4FAFC"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Drive Me Go to access your photos to set a profile picture.",
+          "cameraPermission": "Allow Drive Me Go to use the camera to take a profile picture."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Drive Me Go uses your location to share live trip progress with your passengers."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-image"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiUrl": "https://api.drivemego.com",
+      "webUrl": "https://drivemego.com",
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+import express from "express"
+import {
+    getWalletBalance,
+    getWalletTransactions,
+    addFundsToWallet,
+    withdrawFromWallet,
+    transferFunds,
+    getWalletStatement,
+    requestPayout,
+    getUserPayouts,
+    createPaymentSession,
+    getPaymentConfig,
+    generateTestIBAN,
+    getSupportedBanks
+} from "../controllers/walletController.js"
+import { verifyToken } from "../middleware/auth.js"
+
+const router = express.Router()
+
+// Apply authentication middleware to all routes
+router.use(verifyToken)
+
+// Get wallet balance
+router.get("/balance", getWalletBalance)
+
+// Get wallet transactions
+router.get("/transactions", getWalletTransactions)
+
+// Get payment config based on user's country
+router.get("/payment-config", getPaymentConfig)
+
+// Create payment session for adding funds
+router.post("/create-payment-session", createPaymentSession)
+
+// Add funds to wallet
+router.post("/add-funds", addFundsToWallet)
+
+// Withdraw from wallet
+router.post("/withdraw", withdrawFromWallet)
+
+// Transfer funds to another user
+router.post("/transfer", transferFunds)
+
+// Get wallet statement
+router.get("/statement", getWalletStatement)
+
+// Request payout
+router.post("/payout", requestPayout)
+
+// Get user payouts
+router.get("/payouts", getUserPayouts)
+
+// Get test IBANs for withdrawal testing (development only)
+router.get("/test-ibans", generateTestIBAN)
+
+// Get supported banks for a country
+router.get("/supported-banks", getSupportedBanks)
+
+export default router

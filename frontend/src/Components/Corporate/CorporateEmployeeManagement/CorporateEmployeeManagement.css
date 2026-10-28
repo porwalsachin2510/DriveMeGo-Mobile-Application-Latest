@@ -1,0 +1,773 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+.drivemego-cem-corporate-employee-management {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.drivemego-cem-management-header {
+  margin-bottom: 30px;
+}
+
+.drivemego-cem-management-header h2 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.drivemego-cem-tab-navigation {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.drivemego-cem-tab-btn {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.drivemego-cem-tab-btn:hover {
+  color: #374151;
+}
+
+.drivemego-cem-tab-btn.drivemego-cem-active {
+  color: #12b0c4;
+  border-bottom-color: #12b0c4;
+}
+
+.drivemego-cem-management-content {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Employee List Styles */
+.drivemego-cem-employee-list .drivemego-cem-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.drivemego-cem-search-filters {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  max-width: 400px;
+}
+
+.drivemego-cem-search-input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.drivemego-cem-search-input:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.16);
+}
+
+.drivemego-cem-filter-select {
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.drivemego-cem-action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.drivemego-cem-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drivemego-cem-btn-primary {
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  color: white;
+  box-shadow: 0 10px 22px -12px rgba(18, 176, 196, 0.6);
+}
+
+.drivemego-cem-btn-primary:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 14px 28px -12px rgba(18, 176, 196, 0.7);
+}
+
+.drivemego-cem-btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.drivemego-cem-btn-secondary:hover {
+  background: #4b5563;
+}
+
+.drivemego-cem-btn-info {
+  background: #12b0c4;
+  color: white;
+}
+
+.drivemego-cem-btn-info:hover {
+  background: #0e97a8;
+}
+
+.drivemego-cem-btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.drivemego-cem-btn-warning:hover {
+  background: #d97706;
+}
+
+.drivemego-cem-btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.drivemego-cem-btn-danger:hover {
+  background: #dc2626;
+}
+
+.drivemego-cem-btn-success {
+  background: #22c55e;
+  color: white;
+}
+
+.drivemego-cem-btn-success:hover {
+  background: #16a34a;
+}
+
+.drivemego-cem-btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.drivemego-cem-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.drivemego-cem-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.drivemego-cem-employees-table {
+  overflow-x: auto;
+}
+
+.drivemego-cem-employees-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.drivemego-cem-employees-table th,
+.drivemego-cem-employees-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-cem-employees-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+}
+
+.drivemego-cem-employees-table td {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.drivemego-cem-trip-assignment-cell {
+  max-width: 180px;
+  font-size: 12px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drivemego-cem-status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.drivemego-cem-status-badge.drivemego-cem-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.drivemego-cem-status-badge.drivemego-cem-inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.drivemego-cem-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.drivemego-cem-pagination button {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.drivemego-cem-pagination button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.drivemego-cem-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal Styles */
+.drivemego-cem-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.drivemego-cem-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.drivemego-cem-modal.drivemego-cem-modal-large {
+  max-width: 800px;
+}
+
+.drivemego-cem-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-cem-modal-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.drivemego-cem-modal-content{
+padding: 12px;
+}
+
+.drivemego-cem-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drivemego-cem-close-btn:hover {
+  color: #374151;
+}
+
+.drivemego-cem-modal-form {
+  padding: 20px;
+}
+
+.drivemego-cem-form-section {
+  margin-bottom: 30px;
+}
+
+.drivemego-cem-form-section h4 {
+  margin: 0 0 15px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-cem-form-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.drivemego-cem-form-row input,
+.drivemego-cem-form-row select {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.drivemego-cem-form-row input:focus,
+.drivemego-cem-form-row select:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.16);
+}
+
+.drivemego-cem-form-group {
+  margin-bottom: 20px;
+}
+
+.drivemego-cem-form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.drivemego-cem-form-group input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.drivemego-cem-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 8px 5px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Bulk Upload Styles */
+.drivemego-cem-bulk-upload-instructions {
+  margin-bottom: 30px;
+}
+
+.drivemego-cem-bulk-upload-instructions h4 {
+  margin: 0 0 10px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.drivemego-cem-bulk-upload-instructions ol {
+  margin: 0 0 15px 0;
+  padding-left: 20px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.drivemego-cem-bulk-upload-instructions li {
+  margin-bottom: 5px;
+}
+
+.drivemego-cem-upload-preview {
+  margin: 20px 0;
+}
+
+.drivemego-cem-upload-preview h4 {
+  margin: 0 0 10px 0;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.drivemego-cem-preview-list {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.drivemego-cem-preview-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.drivemego-cem-preview-item:last-child {
+  border-bottom: none;
+}
+
+/* Route Schedule Info Styles */
+.drivemego-cem-route-schedule-loading {
+  padding: 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.drivemego-cem-route-schedule-info {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+}
+
+.drivemego-cem-route-schedule-info h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #166534;
+}
+
+.drivemego-cem-schedule-details {
+  font-size: 13px;
+  color: #374151;
+}
+
+.drivemego-cem-schedule-details p {
+  margin: 4px 0;
+}
+
+.drivemego-cem-trip-times-info {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #86efac;
+}
+
+.drivemego-cem-trip-times-info h6 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #166534;
+}
+
+.drivemego-cem-trip-time-item {
+  background: white;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.drivemego-cem-trip-time-item p {
+  margin: 0 0 6px 0;
+}
+
+.drivemego-cem-stop-points-list-info {
+  margin-top: 8px;
+}
+
+.drivemego-cem-stop-points-list-info .drivemego-cem-stop-label {
+  font-size: 12px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.drivemego-cem-stop-label.drivemego-cem-outbound {
+  color: #059669;
+}
+
+.drivemego-cem-stop-label.drivemego-cem-return {
+  color: #d97706;
+}
+
+.drivemego-cem-return-departure-time {
+  margin: 10px 0 0 0;
+  font-size: 13px;
+  color: #d97706;
+}
+
+.drivemego-cem-return-departure-time strong {
+  color: #b45309;
+}
+
+.drivemego-cem-stop-points-list-info ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.drivemego-cem-stop-points-list-info li {
+  margin: 2px 0;
+}
+
+/* Full width input */
+.drivemego-cem-full-width-input {
+  width: 100% !important;
+  flex: 1 1 100% !important;
+}
+
+/* Trip Selection Section */
+.drivemego-cem-trip-selection-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+}
+
+.drivemego-cem-trip-selection-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.drivemego-cem-trip-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+/* Trip Assignment Section */
+.drivemego-cem-trip-assignment-section {
+  margin-top: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.drivemego-cem-outbound-trip-section {
+  padding: 16px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.drivemego-cem-return-trip-section {
+  padding: 16px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+}
+
+.drivemego-cem-trip-section-title {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.drivemego-cem-outbound-title {
+  color: #166534;
+}
+
+.drivemego-cem-return-title {
+  color: #92400e;
+}
+
+.drivemego-cem-trip-section-subtitle {
+  margin: 0 0 16px 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.drivemego-cem-trip-assignment-section .drivemego-cem-form-group {
+  flex: 1;
+}
+
+.drivemego-cem-trip-assignment-section .drivemego-cem-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.drivemego-cem-trip-assignment-section .drivemego-cem-form-group select,
+.drivemego-cem-trip-assignment-section .drivemego-cem-form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.drivemego-cem-home-address-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #059669;
+  font-style: italic;
+}
+
+.drivemego-cem-one-way-notice {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.drivemego-cem-one-way-notice p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* Pass Duration Section */
+.drivemego-cem-section-description {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 16px 0;
+}
+
+.drivemego-cem-pass-duration-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 16px;
+}
+
+.drivemego-cem-pass-duration-info .drivemego-cem-info-icon {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  background: #12b0c4;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.drivemego-cem-pass-duration-info p {
+  margin: 0;
+  font-size: 13px;
+  color: #166534;
+  line-height: 1.5;
+}
+
+/* Employee Details Grid */
+.drivemego-cem-employee-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.drivemego-cem-detail-section {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.drivemego-cem-detail-section h4 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.drivemego-cem-detail-section p {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #374151;
+}
+
+.drivemego-cem-detail-section strong {
+  color: #1f2937;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .drivemego-cem-corporate-employee-management {
+    padding: 15px;
+  }
+  
+  .drivemego-cem-employee-list .drivemego-cem-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .drivemego-cem-search-filters {
+    max-width: none;
+  }
+  
+  .drivemego-cem-form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .drivemego-cem-modal {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .drivemego-cem-employees-table {
+    font-size: 12px;
+  }
+  
+  .drivemego-cem-employees-table th,
+  .drivemego-cem-employees-table td {
+    padding: 8px;
+  }
+  
+  .drivemego-cem-action-buttons {
+    flex-direction: column;
+  }
+}

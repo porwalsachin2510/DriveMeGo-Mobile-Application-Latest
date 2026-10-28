@@ -1,0 +1,439 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================================
+   DriveMeGo — My Quotations (standalone page + embedded content)
+   Covers both the unprefixed classes (MyQuotations.jsx) and the
+   drivemego-corporate- prefixed classes (MyQuotationsContent.jsx).
+   IndiGo-inspired redesign on the brand navy + teal palette.
+   ===================================================================== */
+:root {
+  --dmg-navy: #0a2a43;
+  --dmg-navy-700: #123a58;
+  --dmg-teal: #12b0c4;
+  --dmg-teal-600: #0e97a8;
+  --dmg-teal-050: #e6f7fa;
+  --dmg-cta: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  --dmg-bg: #eef3f8;
+  --dmg-card: #ffffff;
+  --dmg-ink: #0f2233;
+  --dmg-muted: #5b6b7b;
+  --dmg-line: #e4ecf3;
+  --dmg-shadow: 0 10px 30px rgba(10, 42, 67, 0.08);
+  --dmg-jakarta: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.drivemego-corporate-my-quotations-container,
+.drivemego-corporate-my-quotations-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  min-height: 100vh;
+  background: var(--dmg-bg);
+  font-family: var(--dmg-jakarta);
+}
+
+/* ============ HEADER ============ */
+.drivemego-corporate-quotations-header,
+.drivemego-corporate-quotations-header {
+  margin-bottom: 28px;
+}
+
+.drivemego-corporate-quotations-header h1,
+.drivemego-corporate-quotations-header h1 {
+  font-size: clamp(26px, 3.4vw, 34px);
+  font-weight: 800;
+  margin-bottom: 20px;
+  color: var(--dmg-navy);
+  letter-spacing: -0.02em;
+}
+
+.drivemego-corporate-filter-tabs,
+.drivemego-corporate-filter-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drivemego-corporate-filter-tabs button,
+.drivemego-corporate-filter-tabs button {
+  padding: 11px 22px;
+  border: 1.5px solid var(--dmg-line);
+  background: var(--dmg-card);
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--dmg-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drivemego-corporate-filter-tabs button:hover,
+.drivemego-corporate-filter-tabs button:hover {
+  border-color: var(--dmg-teal);
+  color: var(--dmg-teal-600);
+  transform: translateY(-1px);
+}
+
+.drivemego-corporate-filter-tabs button.drivemego-corporate-active,
+.drivemego-corporate-filter-tabs button.drivemego-corporate-active {
+  background: var(--dmg-cta);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(18, 176, 196, 0.28);
+}
+
+/* ============ SUMMARY ============ */
+.drivemego-corporate-quotations-summary,
+.drivemego-corporate-quotations-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
+  margin-bottom: 30px;
+}
+
+.drivemego-corporate-summary-card,
+.drivemego-corporate-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 18px;
+  color: #fff;
+  background:
+    radial-gradient(500px 200px at 90% -30%, rgba(18, 176, 196, 0.35), transparent 60%),
+    linear-gradient(135deg, var(--dmg-navy) 0%, var(--dmg-navy-700) 100%);
+  box-shadow: var(--dmg-shadow);
+}
+
+.drivemego-corporate-summary-card:nth-child(2),
+.drivemego-corporate-summary-card:nth-child(2) {
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  box-shadow: 0 10px 26px rgba(18, 176, 196, 0.3);
+}
+
+.drivemego-corporate-summary-card:nth-child(3),
+.drivemego-corporate-summary-card:nth-child(3) {
+  background: linear-gradient(135deg, #0a7a45 0%, #12a862 100%);
+  box-shadow: 0 10px 26px rgba(10, 122, 69, 0.28);
+}
+
+.drivemego-corporate-summary-card i {
+  font-size: 30px;
+  opacity: 0.92;
+}
+
+.drivemego-corporate-summary-content,
+.drivemego-corporate-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drivemego-corporate-summary-label,
+.drivemego-corporate-summary-label {
+  font-size: 13px;
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+.drivemego-corporate-summary-value,
+.drivemego-corporate-summary-value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* ============ GRID ============ */
+.drivemego-corporate-quotations-grid,
+.drivemego-corporate-quotations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+/* Multi-partner request group */
+.drivemego-corporate-quotation-group {
+  grid-column: 1 / -1;
+  border: 1px solid var(--dmg-line);
+  border-radius: 20px;
+  padding: 22px;
+  background: #f6f9fc;
+}
+
+.drivemego-corporate-quotation-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.drivemego-corporate-quotation-group-badge {
+  background: var(--dmg-cta);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.drivemego-corporate-quotation-group-number {
+  font-weight: 800;
+  color: var(--dmg-navy);
+}
+
+.drivemego-corporate-quotation-group-meta {
+  color: var(--dmg-muted);
+  font-size: 0.88rem;
+}
+
+.drivemego-corporate-quotation-group-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(335px, 1fr));
+  gap: 20px;
+}
+
+/* ============ EMPTY STATE ============ */
+.drivemego-corporate-no-quotations,
+.drivemego-corporate-no-quotations {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 72px 20px;
+  background: var(--dmg-card);
+  border: 1px dashed rgba(18, 176, 196, 0.4);
+  border-radius: 20px;
+  margin: 20px 0;
+}
+
+.drivemego-corporate-no-quotations i,
+.drivemego-corporate-no-quotations i {
+  font-size: 60px;
+  color: var(--dmg-teal);
+  margin-bottom: 20px;
+}
+
+.drivemego-corporate-no-quotations h3,
+.drivemego-corporate-no-quotations h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+  margin-bottom: 10px;
+}
+
+.drivemego-corporate-no-quotations p,
+.drivemego-corporate-no-quotations p {
+  font-size: 16px;
+  color: var(--dmg-muted);
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ============ LOADING ============ */
+.drivemego-corporate-quotations-loading,
+.drivemego-corporate-quotations-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 20px;
+}
+
+.drivemego-corporate-loading-spinner,
+.drivemego-corporate-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid var(--dmg-teal-050);
+  border-top: 4px solid var(--dmg-teal);
+  border-radius: 50%;
+  animation: dmg-spin 1s linear infinite;
+}
+
+@keyframes dmg-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.drivemego-corporate-loading-text,
+.drivemego-corporate-loading-text {
+  font-size: 16px;
+  color: var(--dmg-muted);
+  font-weight: 600;
+}
+
+/* ============ ERROR ============ */
+.drivemego-corporate-quotations-error,
+.drivemego-corporate-quotations-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  padding: 40px;
+  background: #fef4f4;
+  border-radius: 20px;
+  border: 1px solid #f6cccc;
+}
+
+.drivemego-corporate-quotations-error i,
+.drivemego-corporate-quotations-error i {
+  font-size: 60px;
+  color: #e04545;
+  margin-bottom: 20px;
+}
+
+.drivemego-corporate-quotations-error h3,
+.drivemego-corporate-quotations-error h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #a12222;
+  margin-bottom: 10px;
+}
+
+.drivemego-corporate-quotations-error p,
+.drivemego-corporate-quotations-error p {
+  font-size: 16px;
+  color: #c93838;
+  margin-bottom: 20px;
+}
+
+.drivemego-corporate-retry-btn,
+.drivemego-corporate-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--dmg-cta);
+  color: white;
+  border: none;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.drivemego-corporate-retry-btn:hover,
+.drivemego-corporate-retry-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* ============ PAGINATION ============ */
+.drivemego-corporate-pagination,
+.drivemego-corporate-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin-top: 40px;
+  padding: 20px;
+}
+
+.drivemego-corporate-pagination-btn,
+.drivemego-corporate-pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: var(--dmg-card);
+  color: var(--dmg-teal-600);
+  border: 1.5px solid var(--dmg-teal);
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drivemego-corporate-pagination-btn:hover:not(:disabled),
+.drivemego-corporate-pagination-btn:hover:not(:disabled) {
+  background: var(--dmg-cta);
+  border-color: transparent;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.drivemego-corporate-pagination-btn:disabled,
+.drivemego-corporate-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--dmg-line);
+  color: #9aabb9;
+}
+
+.drivemego-corporate-pagination-info,
+.drivemego-corporate-pagination-info {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dmg-navy);
+  padding: 10px 20px;
+  background: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: 100px;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1024px) {
+  .drivemego-corporate-quotations-grid,
+  .drivemego-corporate-quotations-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .drivemego-corporate-my-quotations-container,
+  .drivemego-corporate-my-quotations-container {
+    padding: 24px 15px;
+  }
+
+  .drivemego-corporate-quotations-grid,
+  .drivemego-corporate-quotations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-corporate-filter-tabs,
+  .drivemego-corporate-filter-tabs {
+    flex-direction: column;
+  }
+
+  .drivemego-corporate-filter-tabs button,
+  .drivemego-corporate-filter-tabs button {
+    width: 100%;
+  }
+
+  .drivemego-corporate-quotations-summary,
+  .drivemego-corporate-quotations-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .drivemego-corporate-pagination,
+  .drivemego-corporate-pagination {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .drivemego-corporate-filter-tabs button,
+  .drivemego-corporate-filter-tabs button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .drivemego-corporate-no-quotations,
+  .drivemego-corporate-no-quotations {
+    padding: 56px 15px;
+  }
+}

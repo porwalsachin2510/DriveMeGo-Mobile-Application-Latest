@@ -1,0 +1,140 @@
+.drivemego-fad-b2b-operator-dashboard-fleet-and-drivers {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-family: var(--dmg-font);
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--dmg-navy);
+  margin: 0;
+}
+
+.drivemego-fad-b2b-operator-dashboard-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 20px;
+  background: var(--dmg-cta);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: var(--dmg-cta-shadow);
+  font-family: inherit;
+}
+
+.drivemego-fad-b2b-operator-dashboard-add-btn:hover {
+  background: var(--dmg-cta-hover);
+  transform: translateY(-1px);
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background-color: var(--dmg-card);
+  border: 1px solid var(--dmg-line);
+  border-radius: 14px;
+  box-shadow: var(--dmg-shadow);
+  overflow-x: auto;
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  color: var(--dmg-muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-tab svg {
+  width: 17px;
+  height: 17px;
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-tab:hover {
+  color: var(--dmg-navy);
+  background: var(--dmg-teal-050);
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-tab.drivemego-fad-b2b-operator-dashboard-active {
+  color: #fff;
+  background: var(--dmg-teal);
+  box-shadow: 0 6px 16px rgba(18, 176, 196, 0.28);
+}
+
+.drivemego-fad-b2b-operator-dashboard-fleet-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.drivemego-fad-b2b-operator-dashboard-loading,
+.drivemego-fad-b2b-operator-dashboard-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  color: var(--dmg-muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.drivemego-fad-b2b-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .drivemego-fad-b2b-operator-dashboard-fleet-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .drivemego-fad-b2b-operator-dashboard-fleet-title {
+    font-size: 20px;
+  }
+
+  .drivemego-fad-b2b-operator-dashboard-fleet-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .drivemego-fad-b2b-operator-dashboard-fleet-tab {
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+
+  .drivemego-fad-b2b-operator-dashboard-add-btn {
+    font-size: 13px;
+    padding: 9px 16px;
+  }
+}

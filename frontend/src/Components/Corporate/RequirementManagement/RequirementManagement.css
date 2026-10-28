@@ -1,0 +1,561 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+.drivemego-crm-requirement-management {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.drivemego-crm-management-header {
+  margin-bottom: 30px;
+}
+
+.drivemego-crm-management-header h2 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.drivemego-crm-tab-navigation {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.drivemego-crm-tab-btn {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.drivemego-crm-tab-btn:hover {
+  color: #374151;
+}
+
+.drivemego-crm-tab-btn.drivemego-crm-active {
+  color: #12b0c4;
+  border-bottom-color: #12b0c4;
+}
+
+.drivemego-crm-management-content {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Statistics Cards */
+.drivemego-crm-stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.drivemego-crm-stat-card {
+  background: linear-gradient(135deg, #0a2a43 0%, #12b0c4 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 16px 36px -20px rgba(10, 42, 67, 0.6);
+}
+
+.drivemego-crm-stat-icon {
+  font-size: 32px;
+  opacity: 0.8;
+}
+
+.drivemego-crm-stat-content {
+  flex: 1;
+}
+
+.drivemego-crm-stat-label {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 5px;
+}
+
+.drivemego-crm-stat-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* Requirement List Styles */
+.drivemego-crm-requirement-list .drivemego-crm-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.drivemego-crm-search-filters {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  max-width: 400px;
+}
+
+.drivemego-crm-search-input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.drivemego-crm-search-input:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.16);
+}
+
+.drivemego-crm-filter-select {
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.drivemego-crm-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drivemego-crm-btn-primary {
+  background: linear-gradient(135deg, #16bccf 0%, #0e97a8 100%);
+  color: white;
+  box-shadow: 0 10px 22px -12px rgba(18, 176, 196, 0.6);
+}
+
+.drivemego-crm-btn-primary:hover {
+  filter: brightness(1.04);
+}
+
+.drivemego-crm-btn-secondary {
+  background: #6b7280;
+  color: white;
+  margin-bottom: 16px;
+}
+
+.drivemego-crm-btn-secondary:hover {
+  background: #4b5563;
+}
+
+.drivemego-crm-btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.drivemego-crm-btn-success:hover {
+  background: #059669;
+}
+
+.drivemego-crm-btn-info {
+  background: #12b0c4;
+  color: white;
+}
+
+.drivemego-crm-btn-info:hover {
+  background: #0e97a8;
+}
+
+.drivemego-crm-btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.drivemego-crm-btn-warning:hover {
+  background: #d97706;
+}
+
+.drivemego-crm-btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.drivemego-crm-btn-danger:hover {
+  background: #dc2626;
+}
+
+.drivemego-crm-btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.drivemego-crm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.drivemego-crm-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.drivemego-crm-requirements-table {
+  overflow-x: auto;
+}
+
+.drivemego-crm-requirements-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.drivemego-crm-requirements-table th,
+.drivemego-crm-requirements-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-crm-requirements-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+}
+
+.drivemego-crm-requirements-table td {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.drivemego-crm-requirement-title {
+  font-weight: 500;
+  color: #374151;
+}
+
+.drivemego-crm-tags {
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.drivemego-crm-tag {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.drivemego-crm-vehicle-info {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.drivemego-crm-status-badge, .drivemego-crm-priority-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+}
+
+.drivemego-crm-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.drivemego-crm-pagination button {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.drivemego-crm-pagination button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.drivemego-crm-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal Styles */
+.drivemego-crm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.drivemego-crm-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.drivemego-crm-large-modal {
+  max-width: 900px;
+}
+
+.drivemego-crm-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-crm-modal-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.drivemego-crm-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drivemego-crm-close-btn:hover {
+  color: #374151;
+}
+
+.drivemego-crm-modal-form {
+  padding: 20px;
+}
+
+.drivemego-crm-form-section {
+  margin-bottom: 30px;
+}
+
+.drivemego-crm-form-section h4 {
+  margin: 0 0 15px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.drivemego-crm-form-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.drivemego-crm-form-row input,
+.drivemego-crm-form-row select,
+.drivemego-crm-form-row textarea {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.drivemego-crm-form-row input:focus,
+.drivemego-crm-form-row select:focus,
+.drivemego-crm-form-row textarea:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.16);
+}
+
+.drivemego-crm-form-row textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Form Group Styles */
+.drivemego-crm-form-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 6px;
+}
+
+.drivemego-crm-form-group-full {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.drivemego-crm-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.drivemego-crm-required {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.drivemego-crm-form-group input,
+.drivemego-crm-form-group select,
+.drivemego-crm-form-group textarea {
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.drivemego-crm-form-group input:focus,
+.drivemego-crm-form-group select:focus,
+.drivemego-crm-form-group textarea:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.16);
+}
+
+/* Textarea specific styles */
+.drivemego-crm-textarea {
+  resize: vertical;
+  min-height: 100px;
+  padding: 10px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.drivemego-crm-textarea:focus {
+  outline: none;
+  border-color: #12b0c4;
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.16);
+}
+
+/* Vehicle requirement card header */
+.drivemego-crm-vehicle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.drivemego-crm-vehicle-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.drivemego-crm-vehicle-requirement-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.drivemego-crm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.drivemego-crm-action-buttons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .drivemego-crm-requirement-management {
+    padding: 15px;
+  }
+  
+  .drivemego-crm-requirement-list .drivemego-crm-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .drivemego-crm-search-filters {
+    max-width: none;
+  }
+  
+  .drivemego-crm-form-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .drivemego-crm-form-group {
+    width: 100%;
+  }
+  
+  .drivemego-crm-modal {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .drivemego-crm-requirements-table {
+    font-size: 12px;
+  }
+  
+  .drivemego-crm-requirements-table th,
+  .drivemego-crm-requirements-table td {
+    padding: 8px;
+  }
+  
+  .drivemego-crm-action-buttons {
+    flex-direction: column;
+  }
+  
+  .drivemego-crm-stats-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .drivemego-crm-vehicle-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}

@@ -1,0 +1,425 @@
+/* FindRoutes - Prefixed with fr- */
+.fr-find-routes-section {
+  background: transparent;
+  text-align: left;
+}
+
+/* white content panel that holds controls + the routes list */
+.fr-routes-panel {
+  background-color: #ffffff;
+  border: 1px solid var(--dmg-line);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(10, 42, 67, 0.05);
+}
+
+/* Search & Filter Controls */
+.fr-routes-controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.fr-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.fr-search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--dmg-muted-2);
+  pointer-events: none;
+}
+
+.fr-search-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.fr-search-input {
+  width: 100%;
+  padding: 11px 14px 11px 40px;
+  border: 1px solid var(--dmg-line);
+  border-radius: 10px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: var(--dmg-navy);
+  outline: none;
+  line-height: 1.5;
+}
+
+.fr-search-input:focus {
+  outline: none;
+  border-color: var(--dmg-teal);
+  box-shadow: 0 0 0 3px rgba(18, 176, 196, 0.14);
+}
+
+.fr-search-input::placeholder {
+  color: var(--dmg-muted-2);
+}
+
+.fr-filter-box .fr-filter-select {
+  padding: 10px 14px;
+  border: 1px solid var(--dmg-line);
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: #ffffff;
+  color: var(--dmg-ink);
+  cursor: pointer;
+  -webkit-appearance: auto;
+  -moz-appearance: auto;
+  appearance: auto;
+  line-height: 1.5;
+  outline: none;
+}
+
+.fr-filter-box .fr-filter-select:focus {
+  outline: none;
+  border-color: var(--dmg-teal);
+}
+
+/* Routes List */
+.fr-routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+/* Route Card */
+.fr-route-card {
+  background-color: #ffffff;
+  border: 1px solid var(--dmg-line);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.2s;
+}
+
+.fr-route-card:hover {
+  border-color: var(--dmg-line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.fr-route-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.fr-route-info h3 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+.fr-route-status {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.fr-route-status.fr-active {
+  background: #c6f6d5;
+  color: #276749;
+}
+
+.fr-route-status.fr-available {
+  background: var(--dmg-teal-100);
+  color: #2a4365;
+}
+
+.fr-route-status.fr-booked {
+  background: #c6f6d5;
+  color: #276749;
+}
+
+.fr-route-status.fr-saved {
+  background: #feebc8;
+  color: #7b341e;
+}
+
+.fr-route-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fr-route-price {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.fr-price-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.fr-price-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--dmg-muted);
+}
+
+.fr-price-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dmg-teal-700);
+}
+
+.fr-route-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fr-route-path {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background-color: var(--dmg-bg);
+  border-radius: 8px;
+  border: 1px solid var(--dmg-line);
+}
+
+.fr-route-path .fr-route-point {
+  font-size: 14px;
+  color: var(--dmg-navy);
+}
+
+.fr-route-path .fr-route-point strong {
+  color: var(--dmg-muted);
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.fr-route-path .fr-route-arrow {
+  color: var(--dmg-muted-2);
+  flex-shrink: 0;
+}
+
+.fr-route-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.fr-route-meta .fr-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background-color: var(--dmg-bg);
+  border-radius: 6px;
+  border: 1px solid var(--dmg-line);
+}
+
+.fr-route-meta .fr-meta-label {
+  font-size: 11px;
+  color: var(--dmg-muted-2);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.fr-route-meta .fr-meta-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+.fr-route-schedule {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.fr-schedule-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fr-schedule-label {
+  font-size: 12px;
+  color: var(--dmg-muted);
+  font-weight: 500;
+}
+
+.fr-schedule-time {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+/* Operating Days */
+.fr-route-days {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fr-days-label {
+  font-size: 12px;
+  color: var(--dmg-muted);
+  font-weight: 500;
+}
+
+.fr-days-list {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.fr-day-badge {
+  padding: 2px 8px;
+  background-color: var(--dmg-line);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dmg-ink);
+}
+
+/* Seats Info */
+.fr-route-seats-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fr-seats-label {
+  font-size: 12px;
+  color: var(--dmg-muted);
+  font-weight: 500;
+}
+
+.fr-seats-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+}
+
+/* Route Actions */
+.fr-route-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dmg-line);
+}
+
+.fr-book-btn {
+  flex: 1;
+  padding: 10px 20px;
+  background: var(--dmg-cta, linear-gradient(135deg, #16bccf 0%, #0e97a8 100%));
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 8px 18px rgba(18, 176, 196, 0.28);
+}
+
+.fr-book-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(18, 176, 196, 0.36);
+}
+
+.fr-book-btn:disabled {
+  background: var(--dmg-muted-2);
+  cursor: not-allowed;
+}
+
+.fr-save-btn {
+  padding: 8px 16px;
+  background: #fff;
+  color: var(--dmg-navy);
+  border: 1px solid var(--dmg-line);
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fr-save-btn:hover {
+  background: var(--dmg-bg);
+  border-color: var(--dmg-muted-2);
+}
+
+.fr-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fr-loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--dmg-muted-2);
+}
+
+.fr-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.fr-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--dmg-navy);
+  margin: 0;
+}
+
+.fr-empty-subtitle {
+  font-size: 14px;
+  color: var(--dmg-muted);
+  margin: 0;
+}
+
+/* Tablet */
+@media (max-width: 1199px) {
+  .fr-routes-panel {
+    padding: 20px;
+  }
+
+  .fr-empty-title {
+    font-size: 15px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .fr-routes-panel {
+    padding: 16px;
+  }
+
+  .fr-empty-title {
+    font-size: 14px;
+  }
+
+  .fr-empty-subtitle {
+    font-size: 12px;
+  }
+}
