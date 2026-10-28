@@ -21,6 +21,8 @@ export default function Wallet() {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("100");
   const [busy, setBusy] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [wd, setWd] = useState({ amount: "", iban: "", accountHolderName: "" });
 
   const bal = useQuery({ queryKey: ["wallet", "balance"], queryFn: walletService.balance });
   const tx = useQuery({ queryKey: ["wallet", "transactions"], queryFn: () => walletService.transactions(1, 20) });
@@ -51,6 +53,27 @@ export default function Wallet() {
     }
   };
 
+  const withdraw = async () => {
+    const value = Number(wd.amount);
+    if (!Number.isFinite(value) || value <= 0) return Alert.alert("Invalid amount", "Enter a valid amount to withdraw.");
+    if (value > balance) return Alert.alert("Insufficient balance", "You cannot withdraw more than your balance.");
+    const iban = wd.iban.replace(/\s+/g, "").toUpperCase();
+    if (iban.length < 15) return Alert.alert("Invalid IBAN", "Enter a valid IBAN.");
+    if (!wd.accountHolderName.trim()) return Alert.alert("Missing name", "Enter the account holder name.");
+    setBusy(true);
+    try {
+      const res = await walletService.withdraw({ amount: value, iban, accountHolderName: wd.accountHolderName.trim(), currency });
+      setWithdrawOpen(false);
+      setWd({ amount: "", iban: "", accountHolderName: "" });
+      qc.invalidateQueries({ queryKey: ["wallet"] });
+      Alert.alert("Withdrawal requested", res?.message || "Your withdrawal is being processed.");
+    } catch (e) {
+      Alert.alert("Withdrawal failed", e?.response?.data?.message || e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Screen header={<AppHeader />} tabBarSpace refreshing={bal.isRefetching || tx.isRefetching} onRefresh={refresh}>
       <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
@@ -72,8 +95,26 @@ export default function Wallet() {
           <Stat icon="time-outline" label="Transactions" value={String(list.length)} />
           <Stat icon="wallet-outline" label="Total Spent" value={formatMoney(totalSpent, currency)} />
         </View>
-        <Button title="Add Funds" icon="add" onPress={() => setOpen(true)} />
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}><Button title="Add Funds" icon="add" onPress={() => setOpen(true)} /></View>
+          <View style={{ flex: 1 }}>
+            <Button title="Withdraw" icon="arrow-up" variant="outline" disabled={balance <= 0} onPress={() => setWithdrawOpen(true)} />
+          </View>
+        </View>
       </Card>
+
+      <Modal visible={withdrawOpen} transparent animationType="slide" onRequestClose={() => setWithdrawOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setWithdrawOpen(false)} />
+        <View style={styles.sheet}>
+          <Text style={[type.h2, { marginBottom: 4 }]}>Withdraw to Bank</Text>
+          <Text style={[type.small, { marginBottom: 14 }]}>{`Available: ${formatMoney(balance, currency)}`}</Text>
+          <TextInput value={wd.amount} onChangeText={(v) => setWd((s) => ({ ...s, amount: v }))} keyboardType="decimal-pad" style={styles.amountInput} placeholder="Amount" placeholderTextColor={colors.subtle} accessibilityLabel="Withdrawal amount" />
+          <TextInput value={wd.iban} onChangeText={(v) => setWd((s) => ({ ...s, iban: v }))} autoCapitalize="characters" style={styles.textInput} placeholder="IBAN" placeholderTextColor={colors.subtle} accessibilityLabel="IBAN" />
+          <TextInput value={wd.accountHolderName} onChangeText={(v) => setWd((s) => ({ ...s, accountHolderName: v }))} style={styles.textInput} placeholder="Account holder name" placeholderTextColor={colors.subtle} accessibilityLabel="Account holder name" />
+          <View style={{ height: 14 }} />
+          <Button title="Request Withdrawal" onPress={withdraw} loading={busy} />
+        </View>
+      </Modal>
 
       <View style={{ marginTop: 26 }}>
         <SectionTitle title="Recent Transactions" />
@@ -154,5 +195,6 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: colors.overlay },
   sheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 34 },
   amountInput: { height: 56, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, fontSize: 22, fontWeight: "800", color: colors.navy, backgroundColor: colors.tealTint },
+  textInput: { height: 50, marginTop: 10, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, fontSize: 15, color: colors.navy, backgroundColor: "#fff" },
   preset: { flex: 1, height: 42, borderRadius: radius.pill, backgroundColor: colors.tealSoft, alignItems: "center", justifyContent: "center" },
 });

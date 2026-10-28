@@ -360,6 +360,8 @@ export function PassengerQuickActions({ basePath }) {
     { icon: "git-compare-outline", label: "Route Change", onPress: () => router.push(`${basePath}/route-change`), tone: colors.info },
     { icon: "warning-outline", label: "Emergency SOS", onPress: () => router.push(`${basePath}/sos`), tone: colors.danger },
     { icon: "document-text-outline", label: "No-Show History", onPress: () => router.push(`${basePath}/no-shows`), tone: colors.navy },
+    { icon: "calendar-number-outline", label: "Manage My Days", onPress: () => router.push(`${basePath}/manage-days`), tone: colors.teal },
+    { icon: "notifications-outline", label: "Notifications", onPress: () => router.push("/notifications"), tone: colors.info },
   ];
 
   return (

@@ -37,6 +37,7 @@ export const bookingService = {
   passenger: (params) => api.get("/bookings/passenger", { params }).then(unwrap),
   details: (bookingId) => api.get(`/b2c-bookings/booking/${bookingId}`).then(unwrap),
   cancellationPreview: (bookingId) => api.get(`/bookings/${bookingId}/cancellation-preview`).then(unwrap),
+  dailyTrips: (bookingId) => api.get(`/bookings/${bookingId}/daily-trips`).then(unwrap),
   cancel: (bookingId, cancellationReason) =>
     api.put(`/bookings/${bookingId}/cancel`, { cancellationReason }).then(unwrap),
   userPasses: (userId) => api.get(`/monthly-pass/user/${userId}`).then(unwrap),
@@ -51,6 +52,7 @@ export const walletService = {
   balance: () => api.get("/wallet/balance").then(unwrap),
   transactions: (page = 1, limit = 20) => api.get("/wallet/transactions", { params: { page, limit } }).then(unwrap),
   createPaymentSession: (payload) => api.post("/wallet/create-payment-session", payload).then(unwrap),
+  withdraw: (payload) => api.post("/wallet/withdraw", payload).then(unwrap),
 };
 
 export const notificationService = {

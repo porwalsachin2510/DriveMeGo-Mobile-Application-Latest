@@ -8,5 +8,5 @@ const TABS = [
 ];
 
 export default function SchoolStudentLayout() {
-  return <RoleTabs role={ROLES.SCHOOL_STUDENT} tabs={TABS} hidden={["account", "live", "feedback", "route-change", "sos", "no-shows"]} />;
+  return <RoleTabs role={ROLES.SCHOOL_STUDENT} tabs={TABS} hidden={["account", "live", "feedback", "route-change", "sos", "no-shows", "manage-days"]} />;
 }

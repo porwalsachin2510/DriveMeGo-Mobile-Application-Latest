@@ -40,7 +40,9 @@ export const employeeService = {
   history: (params) => api.get("/travel-history/my-history", { params }).then(unwrap),
   activeTrip: (coords) => api.get("/trips/my-active-trip", { params: coords || {} }).then(unwrap),
   cancelTrip: (tripId, reason) =>
-    api.post("/corporate-employee-users/booking", { action: "CANCEL", tripId, reason }).then(unwrap),
+    api.post("/corporate-employee-users/booking", { action: "cancel", tripId, reason }).then(unwrap),
+  manageDays: (action, dates, reason) =>
+    api.post("/corporate-employee-users/booking", { action, dates, reason }).then(unwrap),
   notTravelingToday: (reason) =>
     api.post("/corporate-employee-users/not-traveling-today", { date: new Date().toISOString(), reason }).then(unwrap),
   rateTrip: (payload) => api.post("/corporate-employee-users/rate-trip", payload).then(unwrap),

@@ -63,8 +63,8 @@ export const dailyTripService = {
 };
 
 export const subscriptionSettingsService = {
-  get: () => api.get("/subscription-settings").then(unwrap),
-  setAutoRenewal: (autoRenewal) => api.put("/subscription-settings/auto-renewal", { autoRenewal }).then(unwrap),
+  get: () => api.get("/subscription-settings/settings").then(unwrap),
+  setAutoRenewal: (autoRenewal) => api.put("/subscription-settings/settings", { autoRenewal }).then(unwrap),
 };
 
 export const commissionService = {

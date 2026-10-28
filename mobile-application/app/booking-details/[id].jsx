@@ -59,11 +59,26 @@ export default function BookingDetails() {
   const cancellable = ["PENDING", "PENDING_APPROVAL", "BOOKED", "CONFIRMED"].includes(status);
   const vImg = resolveImage(vehicle.image || vehicle.vehicleImage);
 
-  const confirmCancel = () =>
-    Alert.alert("Cancel booking", "Are you sure you want to cancel this booking?", [
+  const confirmCancel = async () => {
+    let message = "Are you sure you want to cancel this booking?";
+    try {
+      const res = await bookingService.cancellationPreview(id);
+      const p = res?.data || res || {};
+      if (p.cashCancellationDue > 0) {
+        message = `A cancellation charge of ${formatMoney(p.cashCancellationDue, currency)} will be due.`;
+      } else if (p.isFree) {
+        message = `Free cancellation. Refund: ${formatMoney(p.refundAmount ?? p.refundableBase ?? 0, currency)}.`;
+      } else if (p.cancellationFee != null) {
+        message = `Cancellation fee: ${formatMoney(p.cancellationFee, currency)}${p.chargePercentage ? ` (${p.chargePercentage}%)` : ""}\nRefund to you: ${formatMoney(p.refundAmount ?? 0, currency)}`;
+      }
+    } catch {
+      // Preview is informational; cancellation can still proceed without it.
+    }
+    Alert.alert("Cancel booking", message, [
       { text: "Keep", style: "cancel" },
       { text: "Cancel Booking", style: "destructive", onPress: () => cancel.mutate() },
     ]);
+  };
 
   return (
     <Screen
@@ -137,6 +152,8 @@ export default function BookingDetails() {
         ) : null}
       </Block>
 
+      <DailyTrips bookingId={id} />
+
       {partner.fullName || partner.email ? (
         <Block title="Service Provider" icon="business-outline">
           <Info k="Name" v={partner.fullName || partner.companyName || "-"} />
@@ -144,6 +161,33 @@ export default function BookingDetails() {
         </Block>
       ) : null}
     </Screen>
+  );
+}
+
+const TRIP_TONE = { COMPLETED: "success", IN_PROGRESS: "info", STARTED: "info", CANCELLED: "danger", NO_SHOW: "warning" };
+
+function DailyTrips({ bookingId }) {
+  const q = useQuery({ queryKey: ["booking", bookingId, "daily-trips"], queryFn: () => bookingService.dailyTrips(bookingId) });
+  const trips = q.data?.data || [];
+  if (q.isLoading || trips.length === 0) return null;
+  return (
+    <Block title={`Upcoming Trips (${trips.length})`} icon="calendar-outline">
+      {trips.slice(0, 10).map((t, i) => {
+        const s = String(t.tripStatus || "Scheduled").toUpperCase().replace(/\s+/g, "_");
+        return (
+          <View key={String(t._id || i)} style={[styles.trip, i > 0 && styles.tripBorder]}>
+            <View style={{ flex: 1 }}>
+              <Text style={type.h3}>{formatDateLong(t.tripDate || t.date)}</Text>
+              <Text style={type.small} numberOfLines={1}>
+                {[t.pickupTime, t.tripType && String(t.tripType).replace(/_/g, " "), t.driverName].filter(Boolean).join("  \u2022  ")}
+              </Text>
+            </View>
+            <Badge label={s.replace(/_/g, " ")} tone={TRIP_TONE[s] || "teal"} />
+          </View>
+        );
+      })}
+      {trips.length > 10 ? <Text style={[type.small, { marginTop: 8 }]}>{`+ ${trips.length - 10} more trips scheduled`}</Text> : null}
+    </Block>
   );
 }
 
@@ -186,5 +230,7 @@ const styles = StyleSheet.create({
   leg: { backgroundColor: colors.tealTint, borderRadius: radius.md, padding: 12, marginBottom: 8 },
   legLabel: { fontSize: 10, fontWeight: "800", color: colors.tealDark, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 6 },
   info: { flexDirection: "row", justifyContent: "space-between", gap: 16, paddingVertical: 7 },
+  trip: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
+  tripBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   vehicle: { width: "100%", height: 150, borderRadius: radius.md, marginBottom: 10 },
 });

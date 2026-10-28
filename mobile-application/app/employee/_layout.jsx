@@ -8,5 +8,5 @@ const TABS = [
 ];
 
 export default function EmployeeLayout() {
-  return <RoleTabs role={ROLES.CORPORATE_EMPLOYEE} tabs={TABS} hidden={["account", "live", "feedback", "route-change", "sos", "no-shows"]} />;
+  return <RoleTabs role={ROLES.CORPORATE_EMPLOYEE} tabs={TABS} hidden={["account", "live", "feedback", "route-change", "sos", "no-shows", "manage-days"]} />;
 }
