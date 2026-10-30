@@ -45,7 +45,7 @@ export default function TabsLayout() {
         }}
         screenListeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}
       >
-        <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: icon("home", "home-outline") }} />
+        <Tabs.Screen name="(home)" options={{ title: "Home", tabBarIcon: icon("home", "home-outline") }} />
         <Tabs.Screen name="routes" options={{ title: "Routes", tabBarIcon: icon("location", "location-outline") }} />
         <Tabs.Screen name="trips" options={{ title: "Trips", tabBarIcon: icon("calendar", "calendar-outline") }} />
         <Tabs.Screen name="wallet" options={{ title: "Wallet", tabBarIcon: icon("wallet", "wallet-outline") }} />

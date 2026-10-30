@@ -4,14 +4,14 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Screen } from "../../src/components/Screen";
-import { AppHeader } from "../../src/components/AppHeader";
-import { RouteCard } from "../../src/components/RouteCard";
-import { Button, Chip, EmptyState, Loading, SectionTitle } from "../../src/components/ui";
-import { useRoutes } from "../../src/hooks/useRoutes";
-import { routeStore } from "../../src/lib/routeStore";
-import { WEEK_DAYS } from "../../src/utils/format";
-import { colors, radius, shadow, type } from "../../src/theme";
+import { Screen } from "../../../src/components/Screen";
+import { AppHeader } from "../../../src/components/AppHeader";
+import { RouteCard } from "../../../src/components/RouteCard";
+import { Button, Chip, EmptyState, Loading, SectionTitle } from "../../../src/components/ui";
+import { useRoutes } from "../../../src/hooks/useRoutes";
+import { routeStore } from "../../../src/lib/routeStore";
+import { WEEK_DAYS } from "../../../src/utils/format";
+import { colors, radius, shadow, type } from "../../../src/theme";
 
 const DEFAULT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -43,7 +43,7 @@ export default function Home() {
 
   const search = () =>
     router.push({
-      pathname: "/(tabs)/routes",
+      pathname: "/search",
       params: { pickup: pickup.trim(), dropoff: dropoff.trim(), days: JSON.stringify(days) },
     });
 
@@ -62,7 +62,7 @@ export default function Home() {
             Opening new possibilities — freedom to go anywhere, every day.
           </Text>
         </View>
-        <Image source={require("../../assets/images/hero-bus.png")} style={styles.heroBus} contentFit="cover" />
+        <Image source={require("../../../assets/images/hero-bus.png")} style={styles.heroBus} contentFit="cover" />
       </View>
 
       <View style={[styles.searchCard, shadow]}>
@@ -106,7 +106,7 @@ export default function Home() {
           title="Featured Routes"
           subtitle="Curated commutes with verified providers"
           right={
-            <Pressable onPress={() => router.push("/(tabs)/routes")} hitSlop={8}>
+            <Pressable onPress={() => router.push("/search")} hitSlop={8}>
               <Text style={{ color: colors.teal, fontWeight: "700" }}>View All</Text>
             </Pressable>
           }
