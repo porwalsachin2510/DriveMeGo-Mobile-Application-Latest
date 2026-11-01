@@ -1,25 +1,21 @@
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
 import { useRouter } from "expo-router";
 import { Screen } from "./Screen";
 import { AppHeader, resolveImage } from "./AppHeader";
 import { Card } from "./ui";
 import { useAuth } from "../context/AuthContext";
 import { useLocationSharing } from "../context/LocationContext";
-import { WEB_URL } from "../config/env";
 import { initials } from "../utils/format";
 import { ROLE_LABELS } from "../utils/roles";
 import { colors, radius, shadow } from "../theme";
 
-const open = (path) => WebBrowser.openBrowserAsync(`${WEB_URL}${path}`);
-
 const ITEMS = [
-  { icon: "document-text-outline", title: "Terms & Conditions", sub: "Read our terms and conditions", onPress: () => open("/terms-and-conditions") },
-  { icon: "shield-checkmark-outline", title: "Privacy Policy", sub: "Your data, our priority", onPress: () => open("/privacy-policy") },
-  { icon: "information-circle-outline", title: "About Us", sub: "Know more about DriveMeGo", onPress: () => open("/about-us") },
-  { icon: "mail-outline", title: "Contact Us", sub: "Get in touch with our support team", onPress: () => open("/contact-us") },
+  { icon: "document-text-outline", title: "Terms & Conditions", sub: "Read our terms and conditions", path: "/page/terms-and-conditions" },
+  { icon: "shield-checkmark-outline", title: "Privacy Policy", sub: "Your data, our priority", path: "/page/privacy-policy" },
+  { icon: "information-circle-outline", title: "About Us", sub: "Know more about DriveMeGo", path: "/page/about-us" },
+  { icon: "mail-outline", title: "Contact Us", sub: "Get in touch with our support team", path: "/page/contact-us" },
   {
     icon: "call-outline",
     title: "Support Hotline",
@@ -72,7 +68,7 @@ export function AccountScreen({ onBack }) {
         {ITEMS.map((it, i) => (
           <Pressable
             key={it.title}
-            onPress={it.onPress}
+            onPress={it.onPress || (() => router.push(it.path))}
             style={({ pressed }) => [styles.row, i < ITEMS.length - 1 && styles.rowBorder, pressed && { opacity: 0.7 }]}
           >
             <View style={styles.rowIcon}>

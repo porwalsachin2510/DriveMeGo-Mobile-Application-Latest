@@ -3,12 +3,12 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Screen } from "../../src/components/Screen";
-import { FilterRow, InfoCell, PartnerHeader } from "../../src/components/partner";
-import { Badge, Button, Card, EmptyState, Loading } from "../../src/components/ui";
-import { partnerService } from "../../src/services/partner";
-import { getErrorMessage } from "../../src/api/client";
-import { colors, radius, type } from "../../src/theme";
+import { Screen } from "../../../src/components/Screen";
+import { FilterRow, InfoCell, PartnerHeader } from "../../../src/components/partner";
+import { Badge, Button, Card, EmptyState, Loading } from "../../../src/components/ui";
+import { partnerService } from "../../../src/services/partner";
+import { getErrorMessage } from "../../../src/api/client";
+import { colors, radius, type } from "../../../src/theme";
 
 const dayLabel = (d) => String(d).slice(0, 3).replace(/^./, (c) => c.toUpperCase()).toLowerCase().replace(/^./, (c) => c.toUpperCase());
 

@@ -9,6 +9,10 @@ const ITEMS = [
   { icon: "pricetag-outline", title: "My Commission", href: "/partner/commission" },
   { icon: "business-outline", title: "Settlements", href: "/partner/settlements" },
   { icon: "person-circle-outline", title: "Account", href: "/partner/account" },
+  { icon: "document-text-outline", title: "Terms & Conditions", href: "/page/terms-and-conditions" },
+  { icon: "shield-checkmark-outline", title: "Privacy Policy", href: "/page/privacy-policy" },
+  { icon: "information-circle-outline", title: "About Us", href: "/page/about-us" },
+  { icon: "mail-outline", title: "Contact Us", href: "/page/contact-us" },
 ];
 
 export function PartnerMoreSheet({ visible, onClose }) {

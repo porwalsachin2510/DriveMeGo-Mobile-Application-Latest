@@ -5,13 +5,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { Screen } from "../../src/components/Screen";
-import { PartnerHeader, StatTile } from "../../src/components/partner";
-import { Badge, Card, Loading } from "../../src/components/ui";
-import { useAuth } from "../../src/context/AuthContext";
-import { partnerService } from "../../src/services/partner";
-import { formatDate, formatDateNumeric, formatMoney } from "../../src/utils/format";
-import { colors, radius, shadow, type } from "../../src/theme";
+import { Screen } from "../../../src/components/Screen";
+import { PartnerHeader, StatTile } from "../../../src/components/partner";
+import { Badge, Card, Loading } from "../../../src/components/ui";
+import { useAuth } from "../../../src/context/AuthContext";
+import { partnerService } from "../../../src/services/partner";
+import { formatDate, formatDateNumeric, formatMoney } from "../../../src/utils/format";
+import { colors, radius, shadow, type } from "../../../src/theme";
 
 const greeting = () => {
   const h = new Date().getHours();

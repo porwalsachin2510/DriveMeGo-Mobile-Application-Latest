@@ -10,7 +10,8 @@ export function MenuSheet({ visible, onClose, items, title = "Menu", subtitle = 
 
   const go = (href) => {
     onClose();
-    router.push(href);
+    // Let the modal finish dismissing first; pushing while it closes is dropped on iOS.
+    setTimeout(() => router.push(href), 250);
   };
 
   return (

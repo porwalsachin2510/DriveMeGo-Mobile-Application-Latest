@@ -2,6 +2,11 @@ import api from "../api/client";
 
 const unwrap = (res) => res.data;
 
+export const pageService = {
+  page: (slug) => api.get(`/pages/public/${slug}`).then(unwrap),
+  settings: () => api.get("/pages/public/settings").then(unwrap),
+};
+
 export const authService = {
   forgotPassword: (email) => api.post("/auth/forgot-password", { email: email.trim().toLowerCase() }).then(unwrap),
   verifyResetOtp: (email, otp) =>

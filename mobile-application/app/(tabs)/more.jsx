@@ -1,16 +1,14 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { CitySheet } from "../../src/components/CitySheet";
 import { engagementService } from "../../src/services";
 import { Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
 import { Screen } from "../../src/components/Screen";
 import { AppHeader, resolveImage } from "../../src/components/AppHeader";
 import { Card } from "../../src/components/ui";
 import { useAuth } from "../../src/context/AuthContext";
-import { WEB_URL } from "../../src/config/env";
 import { initials } from "../../src/utils/format";
 import { colors, radius, type } from "../../src/theme";
 
@@ -22,8 +20,6 @@ const COUNTRIES = {
   OM: "Muscat, Oman",
   QA: "Doha, Qatar",
 };
-
-const openWeb = (path) => WebBrowser.openBrowserAsync(`${WEB_URL}${path}`);
 
 function Row({ icon, title, sub, onPress, last, danger }) {
   return (
@@ -124,10 +120,10 @@ export default function MoreTab() {
       </Card>
 
       <Card style={styles.group}>
-        <Row icon="document-text-outline" title="Terms & Conditions" sub="Read our terms and conditions" onPress={() => openWeb("/terms-and-conditions")} />
-        <Row icon="shield-checkmark-outline" title="Privacy Policy" sub="Your data, our priority" onPress={() => openWeb("/privacy-policy")} />
-        <Row icon="information-circle-outline" title="About Us" sub="Know more about DriveMeGo" onPress={() => openWeb("/about-us")} />
-        <Row icon="mail-outline" title="Contact Us" sub="Get in touch with our support team" onPress={() => Linking.openURL("mailto:support@drivemego.com")} last />
+        <Row icon="document-text-outline" title="Terms & Conditions" sub="Read our terms and conditions" onPress={() => router.push("/page/terms-and-conditions")} />
+        <Row icon="shield-checkmark-outline" title="Privacy Policy" sub="Your data, our priority" onPress={() => router.push("/page/privacy-policy")} />
+        <Row icon="information-circle-outline" title="About Us" sub="Know more about DriveMeGo" onPress={() => router.push("/page/about-us")} />
+        <Row icon="mail-outline" title="Contact Us" sub="Get in touch with our support team" onPress={() => router.push("/page/contact-us")} last />
       </Card>
 
       <Card style={styles.group}>
