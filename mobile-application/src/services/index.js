@@ -88,6 +88,13 @@ export const profileService = {
     api.put("/commuter/change-password", { currentPassword, newPassword }).then(unwrap),
 };
 
+export const accountService = {
+  get: () => api.get("/users/profile").then(unwrap),
+  update: (payload) => api.put("/users/profile", payload).then(unwrap),
+  changePassword: (currentPassword, newPassword) =>
+    api.put("/users/change-password", { currentPassword, newPassword }).then(unwrap),
+};
+
 export const subscriptionService = {
   settings: () => api.get("/subscription-settings/settings").then(unwrap),
   update: (payload) => api.put("/subscription-settings/settings", payload).then(unwrap),

@@ -12,6 +12,9 @@ import { ROLE_LABELS } from "../utils/roles";
 import { colors, radius, shadow } from "../theme";
 
 const ITEMS = [
+  { icon: "person-circle-outline", title: "Account Settings", sub: "Edit profile, alerts and password", path: "/account-settings" },
+  { icon: "notifications-outline", title: "Notifications", sub: "Your latest alerts and updates", path: "/notifications" },
+  { icon: "cash-outline", title: "Refund Policy", sub: "Cancellations, refunds and credits", path: "/page/refund-policy" },
   { icon: "document-text-outline", title: "Terms & Conditions", sub: "Read our terms and conditions", path: "/page/terms-and-conditions" },
   { icon: "shield-checkmark-outline", title: "Privacy Policy", sub: "Your data, our priority", path: "/page/privacy-policy" },
   { icon: "information-circle-outline", title: "About Us", sub: "Know more about DriveMeGo", path: "/page/about-us" },
